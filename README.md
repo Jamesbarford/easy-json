@@ -63,7 +63,7 @@ The implementations of the parsers in order of least complexity:
 - `jsonParseNull`
 - `jsonParseArray`  - basically moves past whitespace and calls `jsonParseValue`
 - `jsonParseObject` - same as array but calls `jsonParseString` to set the `key`
-- `jsonParseString` - most complex the happy path is simple enough, but parsing `utf-16` makes the code far more tricky.
+- `jsonParseString` - happy path is simple enough, but parsing `utf-16` makes the code far more tricky.
 - `jsonParseNumber` - with a mantissa limit of 18 find both parts of the number as 2 ints and glue it back together
 
 ## SIMD
