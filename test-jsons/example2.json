@@ -1,0 +1,56 @@
+{
+  "number": 898098.999,
+  "string": "hello \u0006",
+  "list": [
+    [
+      "hello",
+      "how",
+      "are",
+      "you"
+    ],
+    [
+      0,
+      1,
+      1,
+      0,
+      9
+    ]
+  ],
+  "utf-16": "what a fast 🐌!",
+  "another": "∢䄡朑",
+  "bool_1": true,
+  "bool_2": false,
+  "NULL": null,
+  "arrOfObj": [
+    {
+      "name": "foo",
+      "value": 24
+    },
+    {
+      "name": "skip",
+      "value": 42
+    },
+    {
+      "name": "bar",
+      "value": 23
+    }
+  ],
+  "object": {
+    "name": "james",
+    "id": 1,
+    "arr": [
+      [
+        1,
+        2
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        5,
+        6
+      ]
+    ]
+  }
+}

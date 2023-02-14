@@ -1,0 +1,149 @@
+{
+  "person": {
+    "name": {
+      "first": "John",
+      "last": "Doe",
+      "middle": {
+        "initial": "A",
+        "fullName": "Adam",
+        "nicknames": [
+          "Johnny",
+          "JD"
+        ]
+      }
+    },
+    "age": 32,
+    "address": {
+      "street": "123 Main St.",
+      "city": "Anytown",
+      "state": "CA",
+      "zip": "12345",
+      "geoLocation": {
+        "latitude": 37.7749,
+        "longitude": -122.4194,
+        "altitude": 10
+      }
+    },
+    "phoneNumbers": [
+      {
+        "type": "home",
+        "number": "555-555-1234",
+        "contactName": "Jane Doe",
+        "callHistory": [
+          {
+            "timestamp": "2022-01-01T12:00:00",
+            "duration": "00:30:00",
+            "direction": "incoming"
+          },
+          {
+            "timestamp": "2022-01-02T13:00:00",
+            "duration": "00:15:00",
+            "direction": "outgoing"
+          }
+        ]
+      },
+      {
+        "type": "work",
+        "number": "555-555-5678",
+        "contactName": "John Smith",
+        "callHistory": [
+          {
+            "timestamp": "2022-01-03T14:00:00",
+            "duration": "00:45:00",
+            "direction": "incoming"
+          },
+          {
+            "timestamp": "2022-01-04T15:00:00",
+            "duration": "00:20:00",
+            "direction": "outgoing"
+          }
+        ]
+      },
+      {
+        "type": "mobile",
+        "number": "555-555-9012",
+        "contactName": "John Doe",
+        "callHistory": [
+          {
+            "timestamp": "2022-01-05T16:00:00",
+            "duration": "00:30:00",
+            "direction": "incoming"
+          },
+          {
+            "timestamp": "2022-01-06T17:00:00",
+            "duration": "00:15:00",
+            "direction": "outgoing"
+          }
+        ]
+      }
+    ],
+    "email": {
+      "personal": "john.doe@gmail.com",
+      "work": "jdoe@company.com",
+      "alternate": "johndoe123@yahoo.com",
+      "mailbox": {
+        "inbox": [
+          {
+            "subject": "Important message",
+            "sender": "Jane Doe",
+            "timestamp": "2022-01-07T18:00:00"
+          },
+          {
+            "subject": "Urgent request",
+            "sender": "John Smith",
+            "timestamp": "2022-01-08T19:00:00"
+          }
+        ],
+        "sent": [
+          {
+            "subject": "Follow-up",
+            "recipient": "Jane Doe",
+            "timestamp": "2022-01-09T20:00:00"
+          },
+          {
+            "subject": "Meeting schedule",
+            "recipient": "John Smith",
+            "timestamp": "2022-01-10T21:00:00"
+          }
+        ],
+        "drafts": [
+          {
+            "subject": "New project proposal",
+            "recipient": "John Doe",
+            "timestamp": "2022-01-11T22:00:00"
+          },
+          {
+            "subject": "Weekly update",
+            "recipient": "Jane Doe",
+            "timestamp": "2022-01-12T23:00:00"
+          }
+        ]
+      }
+    },
+    "bools": [true, false, true, false, "true", "false"],
+    "employment": {
+      "company": "ACME Inc.",
+      "title": "Software Engineer",
+      "startDate": "2021-01-01",
+      "endDate": "2022-12-31",
+      "department": {
+        "name": "Research and Development",
+        "division": "Technology",
+        "employees": [
+          {
+            "name": "Jane Doe",
+            "title": "Manager"
+          },
+          {
+            "name": "John Smith",
+            "title": "Lead Engineer"
+          },
+          {
+            "name": "John Doe",
+            "title": "Software Engineer"
+          }
+        ]
+      }
+    }
+  }
+}

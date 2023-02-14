@@ -1,0 +1,7 @@
+./*.json
+*.dSYM
+parser
+scratch
+a.out
+num
+./perf
