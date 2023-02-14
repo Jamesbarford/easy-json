@@ -70,7 +70,7 @@ The implementations of the parsers in order of least complexity:
 Very limited support for `simd`, currently to `__SSE2__` which was avalible on my macbook pro. It's used for jumping passed whitespace characters.
 
 ## Limitations & Future considerations
-- Allows duplicate keys, though so does `cJSON`
+- Allows duplicate keys, though so does `cJSON`.
 - It would be fun to implement the `json` struct as a red black tree, it would be slower to parse JSON but faster to do lookups. It feels unrealistic that you just want to parse JSON usually you want to get at something within the structure and do it quickly.
-- Floating point precision is a bit iffy, however the aim was to not `#include <math.h>` which this does
-- I'm sure there is more but this is the first limitation that springs to mind
+- Floating point precision is a bit iffy, however the aim was to not `#include <math.h>` which has been achieved.
+- I'm sure there is more but this is the first limitation that springs to mind.
