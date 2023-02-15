@@ -2,7 +2,7 @@
 Easy JSON is a lightweight and simple to understand JSON parser. With an emphasis on readability and some experimentation with the 'Streaming SIMD Extensions 2' (`__SSE2__`). With the usage of `SIMD` for skipping whitespace it appears to be faster than `cJSON` when used on large JSON files. On small JSON files the speed is pretty much the same.
 
 ## Usage
-You need `json.c` & `json.h` and your good.
+You need `json.c` & `json.h` and you're good.
 ```c
 #include "json.h"
 
