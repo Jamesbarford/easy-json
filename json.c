@@ -63,7 +63,7 @@ static double cache_pow10[308 + 308 + 1];
 static int has_initalised_powers = 0;
 
 /* Retrun power of 10 from the cache */
-static __inline double
+static double
 I64Pow10(int idx)
 {
     if (idx > 308) {
@@ -81,7 +81,7 @@ I64Pow10(int idx)
  */
 #if defined(__SSE2__)
 #include <emmintrin.h>
-static __inline size_t
+static size_t
 getNextNonWhitespaceIdx(const char *ptr)
 {
     char *start = (char *)ptr;
@@ -151,7 +151,7 @@ getNextNonWhitespaceIdx(const char *ptr)
 
 #else
 /* Much simpler niave version */
-static __inline size_t
+static size_t
 getNextNonWhitespaceIdx(const char *ptr)
 {
     char *start = (char *)ptr;
@@ -178,7 +178,7 @@ jsonNew(void)
 /**
  * Needs to be null checked before calling this function
  */
-static __inline char
+static char
 jsonUnsafePeekAt(jsonParser *p, size_t idx)
 {
     return p->buffer[idx];
@@ -187,7 +187,7 @@ jsonUnsafePeekAt(jsonParser *p, size_t idx)
 /**
  * Look at the current character
  */
-static __inline char
+static char
 jsonPeek(jsonParser *p)
 {
     return p->buffer[p->offset];
@@ -196,7 +196,7 @@ jsonPeek(jsonParser *p)
 /**
  * Check if we can advance the buffer by 'jmp' characters
  */
-static __inline int
+static int
 jsonCanAdvanceBy(jsonParser *p, size_t jmp)
 {
     return p->offset + jmp < p->buflen;
@@ -205,7 +205,7 @@ jsonCanAdvanceBy(jsonParser *p, size_t jmp)
 /**
  * Advance the offset into the buffer by 'jmp'
  */
-static __inline void
+static void
 jsonUnsafeAdvanceBy(jsonParser *p, size_t jmp)
 {
     p->offset += jmp;
@@ -214,7 +214,7 @@ jsonUnsafeAdvanceBy(jsonParser *p, size_t jmp)
 /**
  * Advance buffers offset
  */
-static __inline void
+static void
 jsonAdvance(jsonParser *p)
 {
     if (jsonCanAdvanceBy(p, 1)) {
@@ -227,7 +227,7 @@ jsonAdvance(jsonParser *p)
 /**
  * Advance to termintor
  */
-static __inline void
+static void
 jsonAdvanceToTerminator(jsonParser *p, char terminator)
 {
     while (jsonCanAdvanceBy(p, 1) && jsonPeek(p) != terminator) {
@@ -238,7 +238,7 @@ jsonAdvanceToTerminator(jsonParser *p, char terminator)
 /**
  * Advance past whitespace characters
  */
-static __inline void
+static void
 jsonAdvanceWhitespace(jsonParser *p)
 {
     p->offset += getNextNonWhitespaceIdx(p->buffer + p->offset);
@@ -355,7 +355,7 @@ countNumberLen(char *ptr)
     return ptr - start;
 }
 
-static __inline long
+static long
 stringToHex(jsonParser *p)
 {
     long retval = 0;
@@ -594,7 +594,7 @@ jsonParseNumber(jsonParser *p)
  * Convert first 4 characters of buf to a decimal
  * representation
  */
-static __inline unsigned int
+static unsigned int
 parseHex4(const unsigned char *buf)
 {
     unsigned int hex = 0;
@@ -623,7 +623,7 @@ parseHex4(const unsigned char *buf)
  * Encodes a codepoint into UTF-8 encoded character(s)
  * Stores result in buffer, incrementing the offset
  * */
-static __inline void
+static void
 utf8Encode(char *buffer, unsigned int codepoint, size_t *offset)
 {
     /* Check if the codepoint can be represented with a single byte (0-127) */
@@ -647,7 +647,7 @@ utf8Encode(char *buffer, unsigned int codepoint, size_t *offset)
     }
 }
 
-static __inline unsigned int
+static unsigned int
 jsonParseUTF16(jsonParser *p)
 {
     if (!jsonCanAdvanceBy(p, 5)) {
@@ -869,7 +869,7 @@ jsonParseNull(jsonParser *p)
  * Given a small amount of starting characters that JSON can be;
  * set what type is ready for the parser
  */
-static __inline int
+static int
 jsonSetExpectedType(jsonParser *p)
 {
     char peek = jsonPeek(p);
@@ -1085,7 +1085,7 @@ printDepth(int depth)
     }
 }
 
-static __inline unsigned char *
+static unsigned char *
 escapeString(char *buf)
 {
     unsigned char *outbuf = NULL;
@@ -1168,7 +1168,7 @@ escapeString(char *buf)
     return outbuf;
 }
 
-static __inline void
+static void
 printNumber(json *J)
 {
     size_t len = 0;
@@ -1189,7 +1189,7 @@ printNumber(json *J)
     printf("%s", tmp);
 }
 
-static __inline void
+static void
 printJsonKey(json *J)
 {
     if (J->key) {
@@ -1429,6 +1429,42 @@ void
 jsonPrint(json *J)
 {
     __json_print(J, 1);
+}
+
+int
+jsonIsObject(json *j)
+{
+    return j && j->type == JSON_OBJECT;
+}
+
+int
+jsonIsArray(json *j)
+{
+    return j && j->type == JSON_ARRAY;
+}
+
+int
+jsonIsNull(json *j)
+{
+    return j && j->type == JSON_NULL;
+}
+
+int
+jsonIsNumber(json *j)
+{
+    return j && j->type == JSON_NUMBER;
+}
+
+int
+jsonIsBool(json *j)
+{
+    return j && j->type == JSON_BOOL;
+}
+
+int
+jsonIsString(json *j)
+{
+    return j && j->type == JSON_STRING;
 }
 
 /**
