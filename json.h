@@ -2,11 +2,6 @@
 #define __JSON_H
 
 #include <stddef.h>
-#if defined(__GNUC__) && __GNUC__ >= 4
-#define __inline __attribute__((always_inline))
-#else
-#define __inline inline
-#endif
 
 #define JSON_MAX_EXPONENT (511)
 #define JSON_SENTINAL ((void *)(long)0x44)
@@ -57,6 +52,13 @@ json *jsonGetArray(json *J);
 json *jsonGetObject(json *J);
 int jsonGetBool(json *J);
 void *jsonGetNull(json *J);
+
+int jsonIsObject(json *j);
+int jsonIsArray(json *j);
+int jsonIsNull(json *j);
+int jsonIsNumber(json *j);
+int jsonIsBool(json *j);
+int jsonIsString(json *j);
 
 json *jsonParse(char *buffer);
 json *jsonParseWithLen(char *buffer, size_t buflen);
