@@ -71,7 +71,7 @@ Very limited support for `simd`, currently to `__SSE2__` which was avalible on m
 
 ## jsonSelect
 This allows for `jq` like expressions to select properties from json. It is heavily inspired by [antirez project](https://github.com/antirez/stonky/blob/main/stonky.c).
-It is provided as a separate file in `json-selector.c` so if you don't require it you are not forced into compiling it into tour project.
+It is provided as a separate file in `json-selector.c` so if you don't require it you are not forced into compiling it into your project.
 
 ```c
 #include "json.h"

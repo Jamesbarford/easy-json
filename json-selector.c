@@ -6,6 +6,12 @@
 #include "json-selector.h"
 #include "json.h"
 
+#define JSON_SEL_INVALD (0)
+#define JSON_SEL_OBJ (1)
+#define JSON_SEL_ARRAY (2)
+#define JSON_SEL_TYPECHECK (3)
+#define JSON_SEL_MAX_BUF (256)
+
 /**
  * Get item from an array of json or return null
  */
