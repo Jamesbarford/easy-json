@@ -38,6 +38,7 @@ The conecptual difference between an array and an object in this structure is th
 ```c
 typedef struct json {
     JSON_DATA_TYPE type;
+    json *next;
     char *key;
     union {
         char *str;
@@ -45,8 +46,7 @@ typedef struct json {
         int boolean;
         json *object;
         json *array;
-    } u;
-    json *next;
+    };
 } json;
 ```
 
@@ -90,7 +90,7 @@ main(void)
 
     json *name = jsonSelect(J, ".array[0].name:s");
     if (name) {
-        printf("%s\n", name->u.str);
+        printf("%s\n", name->str);
     }
 
     /* Free up JSON */

@@ -22,7 +22,7 @@ jsonArrayAt(json *j, int idx)
         return NULL;
     }
 
-    json *node = j->u.array;
+    json *node = j->array;
     int i = 0;
 
     while (node && i < idx) {
@@ -46,7 +46,7 @@ _jsonObjectAt(json *j, const char *name, int insensative)
     }
 
     int (*_strcmp)(const char *, const char *);
-    json *el = j->u.object;
+    json *el = j->object;
 
     if (insensative) {
         _strcmp = strcasecmp;

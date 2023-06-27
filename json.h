@@ -18,6 +18,7 @@ typedef enum JSON_DATA_TYPE {
 typedef struct json json;
 typedef struct json {
     JSON_DATA_TYPE type;
+    json *next;
     char *key;
     union {
         char *str;
@@ -25,11 +26,10 @@ typedef struct json {
         int boolean;
         json *object;
         json *array;
-    } u;
-    json *next;
+    };
 } json;
 
-enum JSON_ERRNO {
+typedef enum JSON_ERRNO {
     JSON_OK,
     JSON_INVALID_UTF16,
     JSON_INVALID_UTF16_SURROGATE,
@@ -44,7 +44,7 @@ enum JSON_ERRNO {
     JSON_CANNOT_ADVANCE,
     JSON_CANNOT_START_PARSE,
     JSON_EOF,
-};
+} JSON_ERRNO;
 
 char *jsonGetString(json *J);
 double jsonGetNumber(json *J);
