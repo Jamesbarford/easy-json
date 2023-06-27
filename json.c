@@ -46,12 +46,11 @@ typedef struct jsonParser {
     /* length of the buffer */
     size_t buflen;
     /* error code when failing to parse the buffer */
-    enum JSON_ERRNO errno;
-    /* This field is a pointer to the root of the json object that represents
+    JSON_ERRNO errno;
+    /* pointer to the root of the json object that represents
      * the data in the buffer. */
     json *J;
-    /* This field is a pointer to the current node in the json object that is
-     * being parsed.
+    /* pointer to the current node in the json object that is being parsed.
      * */
     json *ptr;
 } jsonParser;
@@ -379,10 +378,9 @@ stringToHex(jsonParser *p)
 static long
 stringToI64(jsonParser *p)
 {
-    unsigned long retval = 0;
+    long retval = 0;
     int neg = 0;
     char cur;
-    int run = 1;
     int exponent = 0;
     int exponent_sign = 0;
 
@@ -402,21 +400,19 @@ stringToI64(jsonParser *p)
         }
     }
 
-    run = 1;
-    while (run) {
+    while (1) {
         cur = jsonPeek(p);
         switch (cur) {
         case 'e':
         case 'E':
-            run = 0;
-            continue;
+            goto parse_exponent;
+
         case ',':
         case '\n':
         case ']':
         case '\0':
-            run = 0;
             goto out;
-            break;
+
         default:
             retval = retval * 10 + toInt(cur);
             break;
@@ -424,6 +420,7 @@ stringToI64(jsonParser *p)
         jsonUnsafeAdvanceBy(p, 1);
     }
 
+parse_exponent:
     if (toUpper(jsonPeek(p)) == 'E') {
         jsonUnsafeAdvanceBy(p, 1);
         if (jsonPeek(p) == '-') {
@@ -1018,12 +1015,12 @@ jsonParseValue(jsonParser *p)
     switch (p->type) {
     case JSON_NUMBER:
         J->type = JSON_NUMBER;
-        J->u.num = jsonParseNumber(p);
+        J->num = jsonParseNumber(p);
         break;
 
     case JSON_STRING:
         J->type = JSON_STRING;
-        J->u.str = jsonParseString(p);
+        J->str = jsonParseString(p);
         break;
 
     case JSON_NULL:
@@ -1034,17 +1031,17 @@ jsonParseValue(jsonParser *p)
 
     case JSON_OBJECT:
         J->type = JSON_OBJECT;
-        J->u.object = jsonParseObject(p);
+        J->object = jsonParseObject(p);
         break;
 
     case JSON_BOOL:
         J->type = JSON_BOOL;
-        J->u.boolean = jsonParseBool(p);
+        J->boolean = jsonParseBool(p);
         break;
 
     case JSON_ARRAY:
         J->type = JSON_ARRAY;
-        J->u.array = jsonParseArray(p);
+        J->array = jsonParseArray(p);
         break;
     }
 
@@ -1065,10 +1062,10 @@ __jsonParse(jsonParser *p)
 
     if (peek == '{') {
         J->type = JSON_OBJECT;
-        J->u.object = jsonParseObject(p);
+        J->object = jsonParseObject(p);
     } else if (peek == '[') {
         J->type = JSON_ARRAY;
-        J->u.array = jsonParseArray(p);
+        J->array = jsonParseArray(p);
     } else {
         p->errno = JSON_CANNOT_START_PARSE;
         return 0;
@@ -1173,7 +1170,7 @@ printNumber(json *J)
 {
     size_t len = 0;
     char tmp[26] = { 0 };
-    double num = J->u.num;
+    double num = J->num;
     double test = 0.0;
 
     len = sprintf(tmp, "%1.15g", num);
@@ -1217,14 +1214,14 @@ __json_print(json *J, int depth)
 
         case JSON_STRING:
             printJsonKey(J);
-            unsigned char *escape_str = escapeString(J->u.str);
+            unsigned char *escape_str = escapeString(J->str);
             printf("\"%s\"", escape_str);
             free(escape_str);
             break;
 
         case JSON_ARRAY: {
             printJsonKey(J);
-            json *ptr = J->u.array;
+            json *ptr = J->array;
             printf("[\n");
             __json_print(ptr, depth + 1);
             printDepth(depth);
@@ -1235,14 +1232,14 @@ __json_print(json *J, int depth)
         case JSON_OBJECT:
             printJsonKey(J);
             printf("{\n");
-            __json_print(J->u.object, depth + 1);
+            __json_print(J->object, depth + 1);
             printDepth(depth);
             printf("}");
             break;
 
         case JSON_BOOL:
             printJsonKey(J);
-            if (J->u.boolean == 1) {
+            if (J->boolean == 1) {
                 printf("true");
             } else {
                 printf("false");
@@ -1282,15 +1279,15 @@ jsonRelease(json *J)
 
         switch (ptr->type) {
         case JSON_STRING:
-            free(ptr->u.str);
+            free(ptr->str);
             break;
 
         case JSON_ARRAY:
-            jsonRelease(ptr->u.array);
+            jsonRelease(ptr->array);
             break;
 
         case JSON_OBJECT: {
-            jsonRelease(ptr->u.object);
+            jsonRelease(ptr->object);
             break;
         }
 
@@ -1473,7 +1470,7 @@ jsonIsString(json *j)
 char *
 jsonGetString(json *J)
 {
-    return J->type == JSON_STRING ? J->u.str : NULL;
+    return J->type == JSON_STRING ? J->str : NULL;
 }
 
 /**
@@ -1483,7 +1480,7 @@ jsonGetString(json *J)
 double
 jsonGetNumber(json *J)
 {
-    return J->type == JSON_NUMBER ? J->u.num : -1;
+    return J->type == JSON_NUMBER ? J->num : -1;
 }
 
 /**
@@ -1492,7 +1489,7 @@ jsonGetNumber(json *J)
 json *
 jsonGetArray(json *J)
 {
-    return J->type == JSON_ARRAY ? J->u.array : NULL;
+    return J->type == JSON_ARRAY ? J->array : NULL;
 }
 
 /**
@@ -1501,7 +1498,7 @@ jsonGetArray(json *J)
 json *
 jsonGetObject(json *J)
 {
-    return J->type == JSON_OBJECT ? J->u.object : NULL;
+    return J->type == JSON_OBJECT ? J->object : NULL;
 }
 
 /**
@@ -1510,7 +1507,7 @@ jsonGetObject(json *J)
 int
 jsonGetBool(json *J)
 {
-    return J->type == JSON_BOOL ? J->u.boolean : -1;
+    return J->type == JSON_BOOL ? J->boolean : -1;
 }
 
 /**
