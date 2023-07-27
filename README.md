@@ -1,19 +1,15 @@
 # Easy JSON
-Easy JSON is a lightweight and simple to understand JSON parser. With an emphasis on readability and some experimentation with the 'Streaming SIMD Extensions 2' (`__SSE2__`). With the usage of `SIMD` for skipping whitespace it appears to be faster than `cJSON` when used on large JSON files. On small JSON files the speed is pretty much the same.
+Easy JSON is a lightweight and fast JSON parser with an emphasis on ease of use for parsing and accessing properties in the parsed JSON. There is optional error handling and reporting suitable for use with multiple threads, achieved by using malloc & free though is not required if you do not require it. A speed increase has been obtained by some experimentation with the 'Streaming SIMD Extensions 2' (`__SSE2__`). With the usage of `SIMD` for skipping whitespace it is in some instances faster than `cJSON` especially when used on large JSON files. On small JSON files the speed is much the same.
 
-## Usage
+# Usage
+## Simple Parsing
 You need `json.c` & `json.h` and you're good.
 ```c
 #include "json.h"
 
 static char json_string = "{\"foo\": \"bar\", \"num\": 42.69}";
 
-int
-main(void)
-{
-    /* Initalise internal structures, needs to be called once */
-    jsonInit();
-
+int main(void) {
     /* Get JSON */
     json *J = jsonParse(json_string);
 
@@ -22,8 +18,70 @@ main(void)
     /* Free up JSON */
     jsonRelease(J);
 }
+```
+
+## Accessing properties on the JSON struct
+This allows for `jq` like expressions to select properties from json, this makes accessing properties on the json object much easier. It is heavily inspired by [antirez project](https://github.com/antirez/stonky/blob/main/stonky.c) with adaptations to make it suitable for use with this parser.
+It is provided as a separate file in `json-selector.c` so if you don't require it you are not forced to use it.
+
+```c
+#include "json.h"
+#include "json-selector.h"
+
+static char json_string = "{\"foo\": \"bar\", \"num\": 420.69, \"array\": [{\"id\": 1, \"name\": \"james\"}]}";
+
+int main(void) {
+    /* Get JSON */
+    json *J = jsonParse(json_string);
+
+    /* Access properties on the json */
+    json *name = jsonSelect(J, ".array[0].name:s");
+    json *id = jsonSelect(J, ".array[0].id:i");
+    json *num = jsonSelect(J, ".num:f");
+
+    printf("name: %s\n", name->str);
+    printf("id:   %ld\n", id->integer);
+    printf("num:  %ld\n", num->floating);
+
+    /* Free up JSON */
+    jsonRelease(J);
+}
+```
+
+## Error reporting
+In order to see where an error occured along with a human readible message can be obtained with the following code. Maintaining error state on the `json` struct is optional and can be turned on with a flag. This will make an extra `malloc` call to create `jsonState`, so there is a slight performance hit.
+
+```c
+#include "json.h"
+
+static char json_string = "{\"foo\": \"bar\", \"num\": 420.69.32}";
+
+int main(void) {
+    /* Get JSON */
+    json *J = jsonParseWithFlags(json_string, JSON_STATE_FLAG);
+
+    /* Check to see if the parse worked correctly */
+    if (J->state->error != JSON_OK) {
+        /* Will print the error to stderr */
+        jsonPrintError(J);
+
+        /* Get the string for your own purposes, though the method is slow
+         * so the checking the J->state->error would be the faster option.
+         */
+         char *str_error = jsonGetStrerror(J);
+
+         /* Do something with the error */
+
+         free(str_error);
+    }
+
+    /* Free up JSON */
+    jsonRelease(J);
+}
 
 ```
+
+## No numerical parsing
 
 ## Working with the code
 `main.c` contains a simple program that will read in a file, parse the json, print it and time the `jsonParse` and `jsonRelease` functions.
@@ -31,21 +89,24 @@ main(void)
 Compile with the flag `-DERROR_REPORTING` if you want to print errors to
 `stderr`. There's a debugging function that can be useful for exploring the code.
 
-I tried a few ideas and have split out the more tricky functions into `parse-string` or `parse-number`. Which allow for seeing how they work without the clutter of the other JSON parsing. `char-bitest` was an expriement creating bitmaps to check for characters, which is very slow in comparison to an `if (ch == ' '` check.
+I tried a few ideas and have split out the more tricky functions into `parse-string` or `parse-number`. Which allow for seeing how they work without the clutter of the other JSON parsing. `char-bitest` was an expriement creating bitmaps to check for characters, which is very slow in comparison to an `if (ch == ' '`.
 
 The main structure is very simple and follows the pattern of a linked list.
 The conecptual difference between an array and an object in this structure is that an object has a `key` and an array doesn't.
 ```c
 typedef struct json {
-    JSON_DATA_TYPE type;
+    jsonState *state;
     json *next;
     char *key;
+    JSON_DATA_TYPE type;
     union {
-        char *str;
-        long double num;
-        int boolean;
-        json *object;
         json *array;
+        json *object;
+        char *str;
+        int boolean;
+        char *strnum;
+        double floating;
+        ssize_t integer;
     };
 } json;
 ```
@@ -67,39 +128,10 @@ The implementations of the parsers in order of least complexity:
 - `jsonParseNumber` - with a mantissa limit of 18 find both parts of the number as 2 ints and glue it back together
 
 ## SIMD
-Very limited support for `simd`, currently to `__SSE2__` which was avalible on my macbook pro. It's used for jumping passed whitespace characters.
-
-## jsonSelect
-This allows for `jq` like expressions to select properties from json. It is heavily inspired by [antirez project](https://github.com/antirez/stonky/blob/main/stonky.c).
-It is provided as a separate file in `json-selector.c` so if you don't require it you are not forced into compiling it into your project.
-
-```c
-#include "json.h"
-#include "json-selector.h"
-
-static char json_string = "{\"foo\": \"bar\", \"num\": 420.69, \"array\": [{\"id\": 1, \"name\": \"james\"}]}";
-
-int
-main(void)
-{
-    /* Initalise internal structures, needs to be called once */
-    jsonInit();
-
-    /* Get JSON */
-    json *J = jsonParse(json_string);
-
-    json *name = jsonSelect(J, ".array[0].name:s");
-    if (name) {
-        printf("%s\n", name->str);
-    }
-
-    /* Free up JSON */
-    jsonRelease(J);
-}
-```
+Very limited support for `simd`, currently to `__SSE2__` which was avalible on my macbook pro. It's used for jumping passed whitespace characters 16 characters at a time as opposed to one by one.
 
 ## Limitations & Future considerations
 - Allows duplicate keys, though so does `cJSON`.
 - It would be fun to implement the `json` struct as a red black tree, it would be slower to parse JSON but faster to do lookups. It feels unrealistic that you just want to parse JSON usually you want to get at something within the structure and do it quickly.
-- Floating point precision is a bit iffy, however the aim was to not `#include <math.h>` which has been achieved.
+- Floating point precision is a bit iffy, however the aim was to not `#include <math.h>` or use `strlod` which has been achieved.
 - I'm sure there is more but this is the first limitation that springs to mind.

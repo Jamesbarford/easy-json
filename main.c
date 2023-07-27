@@ -51,8 +51,6 @@ int main(int argc, char **argv) {
 
     raw_json[st.st_size] = '\0';
 
-    jsonInit();
-
     clock_t start_parse = clock();
     json *J = jsonParse(raw_json);
     clock_t end_parse = clock();

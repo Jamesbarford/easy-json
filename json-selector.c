@@ -67,8 +67,12 @@ static int jsonTypeCheck(json *j, char tk) {
         if (!jsonIsString(j))
             return 0;
         return 1;
-    case 'n':
-        if (!jsonIsNumber(j))
+    case 'i':
+        if (!jsonIsInt(j))
+            return 0;
+        return 1;
+    case 'f':
+        if (!jsonIsFloat(j))
             return 0;
         return 1;
     case 'o':
@@ -127,7 +131,8 @@ json *jsonObjectAtCaseInSensitive(json *j, const char *name) {
  *    ":<type>" checks if the currently selected type is of the specified type,
  *              where the type can be a single letter representing:
  *      "s" -> string
- *      "n" -> number
+ *      "f" -> float
+ *      "i" -> int
  *      "a" -> array
  *      "o" -> object
  *      "b" -> boolean
