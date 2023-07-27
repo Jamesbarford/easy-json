@@ -53,6 +53,8 @@ typedef struct jsonParser {
     /* pointer to the current node in the json object that is being parsed.
      * */
     json *ptr;
+    /* Parsing flags */
+    int flags;
 } jsonParser;
 
 /* Pre-calculate powers of 10 */
@@ -265,7 +267,7 @@ static int jsonParseBool(jsonParser *p);
 static int jsonParseValue(jsonParser *p);
 static int jsonParseNull(jsonParser *p);
 static char *jsonParseString(jsonParser *p);
-static double jsonParseNumber(jsonParser *p);
+static void jsonParseNumber(jsonParser *p);
 
 /* Number parsing */
 
@@ -452,8 +454,8 @@ out:
 }
 
 
-static double jsonParseFloat(jsonParser *p, char *ptr, int dec_idx, int mantissa) {
-    int fraction_exponent, exponent;
+static double jsonParseFloat(jsonParser *p, char *ptr, int num_len, int dec_idx, int mantissa) {
+    int fraction_exponent, exponent, exponent_sign, neg;
 
     if (dec_idx < 0) {
         dec_idx = mantissa;
@@ -549,7 +551,7 @@ static double jsonParseFloat(jsonParser *p, char *ptr, int dec_idx, int mantissa
     return retval;
 }
 
-static void jsonParseNumber2(jsonParser *p) {
+static void jsonParseNumber(jsonParser *p) {
     char *ptr = p->buffer + p->offset;
     int num_len = countNumberLen(ptr);
     json *current = p->ptr;
@@ -590,144 +592,8 @@ static void jsonParseNumber2(jsonParser *p) {
         jsonAdvance(p);
     }
 
-    current->floating = jsonParseFloat(p, ptr, dec_idx, mantissa);
+    current->floating = jsonParseFloat(p, ptr, num_len, dec_idx, mantissa);
     current->type = JSON_FLOAT;
-}
-
-/**
- * Parse string to a double
- */
-static double
-jsonParseNumber(jsonParser *p)
-{
-    char *ptr = p->buffer + p->offset;
-    int num_len = countNumberLen(ptr);
-
-    if (num_len == 0) {
-        p->errno = JSON_INVALID_NUMBER;
-        return 0;
-    } else if (num_len == 1) {
-        double retval = toInt(jsonPeek(p));
-        jsonAdvance(p);
-        return retval;
-    }
-
-    int exponent = 0;
-    int fraction_exponent = 0;
-    int exponent_sign = 0;
-    int dec_idx = -1;
-    int neg = 0;
-
-    if (*ptr == '-') {
-        neg = 1;
-        ptr++;
-    } else if (*ptr == '+') {
-        neg = 0;
-        ptr++;
-    } else if (!isNum(*ptr) && *ptr != '.') {
-        p->errno = JSON_INVALID_NUMBER;
-        return 0.0;
-    }
-
-    int mantissa = countMantissa(ptr, &dec_idx);
-
-    if (dec_idx == -1) {
-        // jsonUnsafeAdvanceBy(p, ptr - p->buffer);
-        return stringToI64(p);
-    }
-
-    if (dec_idx < 0) {
-        dec_idx = mantissa;
-    } else {
-        mantissa -= 1;
-    }
-
-    if (mantissa > 18) {
-        fraction_exponent = dec_idx - 18;
-        mantissa = 18;
-    } else {
-        fraction_exponent = dec_idx - mantissa;
-    }
-
-    if (mantissa == 0) {
-        jsonUnsafeAdvanceBy(p, num_len);
-        return 0.0;
-    }
-
-    int ii = 0;
-    int jj = 0;
-    double fraction = 0;
-    for (; mantissa > 9; --mantissa) {
-        char c = *ptr;
-        ptr++;
-        if (c == '.') {
-            c = *ptr;
-            ptr++;
-        }
-        ii = 10 * ii + toInt(c);
-    }
-
-    for (; mantissa > 0; --mantissa) {
-        char c = *ptr;
-        ptr++;
-        if (c == '.') {
-            c = *ptr;
-            ptr++;
-        }
-        jj = 10 * jj + toInt(c);
-    }
-    fraction = (1.0e9 * ii) + jj;
-
-    if (toUpper(*ptr) == 'E') {
-        ptr++;
-        if (*ptr == '-') {
-            exponent_sign = -1;
-            ptr++;
-        } else if (*ptr == '+') {
-            ptr++;
-        }
-        while (isNum(*ptr) && exponent < INT_MAX / 100) {
-            exponent = exponent * 10 + (*ptr - '0');
-            ptr++;
-        }
-        while (isNum(*ptr)) {
-            ptr++;
-        }
-    }
-
-    if (exponent_sign) {
-        exponent = fraction_exponent - exponent;
-    } else {
-        exponent = fraction_exponent + exponent;
-    }
-
-    if (exponent < -JSON_MAX_EXPONENT) {
-        exponent = JSON_MAX_EXPONENT;
-        exponent_sign = 1;
-    } else if (exponent > JSON_MAX_EXPONENT) {
-        exponent = JSON_MAX_EXPONENT;
-        exponent_sign = 0;
-    } else if (exponent < 0) {
-        exponent_sign = 1;
-        exponent = -exponent;
-    } else {
-        exponent_sign = 0;
-    }
-
-    double double_exponent = I64Pow10(exponent);
-    double retval = fraction;
-
-    if (exponent_sign) {
-        retval /= double_exponent;
-    } else {
-        retval *= double_exponent;
-    }
-
-    jsonUnsafeAdvanceBy(p, num_len);
-    if (neg) {
-        return -retval;
-    }
-    return retval;
 }
 
 /**
@@ -1156,20 +1022,15 @@ jsonParseValue(jsonParser *p)
     json *J = p->ptr;
 
     switch (p->type) {
-    case JSON_NUMBER:
-        J->type = JSON_NUMBER;
-        J->num = jsonParseNumber(p);
+    case JSON_NUMBER: {
+        if (p->flags & JSON_STRNUM_FLAG) {
+            J->type = JSON_STRNUM;
+            J->strnum = jsonParseString(p);
+        } else {
+            jsonParseNumber(p);
+        }
         break;
-
-    case JSON_FLOAT:
-        J->type = JSON_FLOAT;
-        J->floating = jsonParseNumber(p);
-        break;
-
-    case JSON_INT:
-        J->type = JSON_INT;
-        J->integer = jsonParseNumber(p);
-        break;
+    }
 
     case JSON_STRING:
         J->type = JSON_STRING;
@@ -1319,27 +1180,6 @@ escapeString(char *buf)
 }
 
 static void
-printNumber(json *J)
-{
-    size_t len = 0;
-    char tmp[26] = { 0 };
-    double num = J->num;
-    double test = 0.0;
-
-    len = sprintf(tmp, "%1.15g", num);
-
-    if (sscanf(tmp, "%lg", &test) != 1) {
-        len = sprintf(tmp, "%1.17g", num);
-    }
-
-    if (len < 0 || len > sizeof(tmp) + 1) {
-        return;
-    }
-    tmp[len] = '\0';
-    printf("%s", tmp);
-}
-
-static void
 printJsonKey(json *J)
 {
     if (J->key) {
@@ -1373,11 +1213,6 @@ __json_print(json *J, int depth)
         case JSON_STRNUM:
             printJsonKey(J);
             printf("%s", J->strnum);
-            break;
-
-        case JSON_NUMBER:
-            printJsonKey(J);
-            printNumber(J);
             break;
 
         case JSON_STRING:
@@ -1644,14 +1479,21 @@ jsonGetString(json *J)
     return J->type == JSON_STRING ? J->str : NULL;
 }
 
-/**
- * FIXME: cannot return -1
- * Get double value or -1
- */
-double
-jsonGetNumber(json *J)
-{
-    return J->type == JSON_NUMBER ? J->num : -1;
+/* Get float from json object */
+double jsonGetFloat(json *J) {
+    return J->type == JSON_FLOAT ? J->floating : 0.0;
+}
+
+/* Get int from json object */
+ssize_t jsonGetInt(json *J) {
+    return J->type == JSON_INT ? J->integer : 0;
+}
+
+/* Get string number from json object, will only be present if the json was 
+ * parsed with JSON_STRNUM_FLAG
+ * */
+char *jsonGetStrnum(json *J) {
+    return J->type == JSON_STRNUM ? J->strnum : NULL;
 }
 
 /**

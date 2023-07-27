@@ -26,14 +26,13 @@ typedef struct json {
     json *next;
     char *key;
     union {
+        json *array;
+        json *object;
         char *str;
-        double num;
+        int boolean;
         char *strnum;
         double floating;
         ssize_t integer;
-        int boolean;
-        json *object;
-        json *array;
     };
 } json;
 
@@ -55,7 +54,7 @@ typedef enum JSON_ERRNO {
 } JSON_ERRNO;
 
 char *jsonGetString(json *J);
-double jsonGetNumber(json *J);
+double jsonGetFloat(json *J);
 json *jsonGetArray(json *J);
 json *jsonGetObject(json *J);
 int jsonGetBool(json *J);
@@ -68,9 +67,9 @@ int jsonIsNumber(json *j);
 int jsonIsBool(json *j);
 int jsonIsString(json *j);
 
-json *jsonParse(char *buffer);
+json *jsonParse(char *raw_json);
 //json *jsonParse(char *raw_json, int flags);
-json *jsonParseWithLen(char *buffer, size_t buflen);
+json *jsonParseWithLen(char *raw_json, size_t buflen);
 void jsonPrint(json *J);
 void jsonRelease(json *J);
 void jsonInit(void);
