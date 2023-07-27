@@ -5,4 +5,5 @@ scratch
 a.out
 num
 testfiles
+tests
 ./perf
