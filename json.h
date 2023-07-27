@@ -1,14 +1,19 @@
 #ifndef __JSON_H
 #define __JSON_H
 
-#include <stddef.h>
+#include <stdio.h>
 
 #define JSON_MAX_EXPONENT (511)
 #define JSON_SENTINAL ((void *)(long)0x44)
+#define JSON_NO_FLAGS (0)
+#define JSON_STRNUM_FLAG (1)
 
 typedef enum JSON_DATA_TYPE {
     JSON_STRING,
     JSON_NUMBER,
+    JSON_FLOAT,
+    JSON_INT,
+    JSON_STRNUM,
     JSON_ARRAY,
     JSON_OBJECT,
     JSON_BOOL,
@@ -23,6 +28,9 @@ typedef struct json {
     union {
         char *str;
         double num;
+        char *strnum;
+        double floating;
+        ssize_t integer;
         int boolean;
         json *object;
         json *array;
@@ -61,6 +69,7 @@ int jsonIsBool(json *j);
 int jsonIsString(json *j);
 
 json *jsonParse(char *buffer);
+//json *jsonParse(char *raw_json, int flags);
 json *jsonParseWithLen(char *buffer, size_t buflen);
 void jsonPrint(json *J);
 void jsonRelease(json *J);

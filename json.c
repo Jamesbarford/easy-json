@@ -375,10 +375,10 @@ stringToHex(jsonParser *p)
     return retval;
 }
 
-static long
+static ssize_t
 stringToI64(jsonParser *p)
 {
-    long retval = 0;
+    ssize_t retval = 0;
     int neg = 0;
     char cur;
     int exponent = 0;
@@ -449,6 +449,149 @@ out:
         return -retval;
     }
     return retval;
+}
+
+
+static double jsonParseFloat(jsonParser *p, char *ptr, int dec_idx, int mantissa) {
+    int fraction_exponent, exponent;
+
+    if (dec_idx < 0) {
+        dec_idx = mantissa;
+    } else {
+        mantissa -= 1;
+    }
+
+    if (mantissa > 18) {
+        fraction_exponent = dec_idx - 18;
+        mantissa = 18;
+    } else {
+        fraction_exponent = dec_idx - mantissa;
+    }
+
+    if (mantissa == 0) {
+        jsonUnsafeAdvanceBy(p, num_len);
+        return 0.0;
+    }
+
+    int ii = 0;
+    int jj = 0;
+    double fraction = 0;
+    for (; mantissa > 9; --mantissa) {
+        char c = *ptr;
+        ptr++;
+        if (c == '.') {
+            c = *ptr;
+            ptr++;
+        }
+        ii = 10 * ii + toInt(c);
+    }
+
+    for (; mantissa > 0; --mantissa) {
+        char c = *ptr;
+        ptr++;
+        if (c == '.') {
+            c = *ptr;
+            ptr++;
+        }
+        jj = 10 * jj + toInt(c);
+    }
+    fraction = (1.0e9 * ii) + jj;
+
+    if (toUpper(*ptr) == 'E') {
+        ptr++;
+        if (*ptr == '-') {
+            exponent_sign = -1;
+            ptr++;
+        } else if (*ptr == '+') {
+            ptr++;
+        }
+        while (isNum(*ptr) && exponent < INT_MAX / 100) {
+            exponent = exponent * 10 + (*ptr - '0');
+            ptr++;
+        }
+        while (isNum(*ptr)) {
+            ptr++;
+        }
+    }
+
+    if (exponent_sign) {
+        exponent = fraction_exponent - exponent;
+    } else {
+        exponent = fraction_exponent + exponent;
+    }
+
+    if (exponent < -JSON_MAX_EXPONENT) {
+        exponent = JSON_MAX_EXPONENT;
+        exponent_sign = 1;
+    } else if (exponent > JSON_MAX_EXPONENT) {
+        exponent = JSON_MAX_EXPONENT;
+        exponent_sign = 0;
+    } else if (exponent < 0) {
+        exponent_sign = 1;
+        exponent = -exponent;
+    } else {
+        exponent_sign = 0;
+    }
+
+    double double_exponent = I64Pow10(exponent);
+    double retval = fraction;
+
+    if (exponent_sign) {
+        retval /= double_exponent;
+    } else {
+        retval *= double_exponent;
+    }
+
+    jsonUnsafeAdvanceBy(p, num_len);
+    if (neg) {
+        return -retval;
+    }
+    return retval;
+}
+
+static void jsonParseNumber2(jsonParser *p) {
+    char *ptr = p->buffer + p->offset;
+    int num_len = countNumberLen(ptr);
+    json *current = p->ptr;
+    int neg = 0;
+    int dec_idx = -1;
+    int mantissa = 0;
+
+    if (num_len == 0) {
+        p->errno = JSON_INVALID_NUMBER;
+        return;
+    } else if (num_len == 1) {
+        current->integer = toInt(jsonPeek(p));
+        current->type = JSON_INT;
+        jsonAdvance(p);
+        return;
+    }
+
+    if (*ptr == '-') {
+        neg = 1;
+        ptr++;
+    } else if (*ptr == '+') {
+        neg = 0;
+        ptr++;
+    } else if (!isNum(*ptr) && *ptr != '.') {
+        p->errno = JSON_INVALID_NUMBER;
+        return;
+    }
+
+    mantissa = countMantissa(ptr, &dec_idx);
+
+    if (dec_idx == -1) {
+        current->integer = stringToI64(p);
+        current->type = JSON_INT;
+        return;
+    }
+
+    if (*ptr == '.') {
+        jsonAdvance(p);
+    }
+
+    current->floating = jsonParseFloat(p, ptr, dec_idx, mantissa);
+    current->type = JSON_FLOAT;
 }
 
 /**
@@ -1018,6 +1161,16 @@ jsonParseValue(jsonParser *p)
         J->num = jsonParseNumber(p);
         break;
 
+    case JSON_FLOAT:
+        J->type = JSON_FLOAT;
+        J->floating = jsonParseNumber(p);
+        break;
+
+    case JSON_INT:
+        J->type = JSON_INT;
+        J->integer = jsonParseNumber(p);
+        break;
+
     case JSON_STRING:
         J->type = JSON_STRING;
         J->str = jsonParseString(p);
@@ -1207,6 +1360,21 @@ __json_print(json *J, int depth)
     while (J) {
         printDepth(depth);
         switch (J->type) {
+        case JSON_INT:
+            printJsonKey(J);
+            printf("%ld", J->integer);
+            break;
+
+        case JSON_FLOAT:
+            printJsonKey(J);
+            printf("%1.17g", J->floating);
+            break;
+
+        case JSON_STRNUM:
+            printJsonKey(J);
+            printf("%s", J->strnum);
+            break;
+
         case JSON_NUMBER:
             printJsonKey(J);
             printNumber(J);
@@ -1279,6 +1447,7 @@ jsonRelease(json *J)
 
         switch (ptr->type) {
         case JSON_STRING:
+        case JSON_STRNUM:
             free(ptr->str);
             break;
 
@@ -1292,6 +1461,8 @@ jsonRelease(json *J)
         }
 
         case JSON_NUMBER:
+        case JSON_FLOAT:
+        case JSON_INT:
         case JSON_BOOL:
         case JSON_NULL:
             break;

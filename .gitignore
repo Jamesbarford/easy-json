@@ -4,4 +4,5 @@ parser
 scratch
 a.out
 num
+testfiles
 ./perf
