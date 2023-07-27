@@ -4,9 +4,9 @@
 #include <stdio.h>
 
 #define JSON_MAX_EXPONENT (511)
-#define JSON_SENTINAL ((void *)(long)0x44)
-#define JSON_NO_FLAGS (0)
-#define JSON_STRNUM_FLAG (1)
+#define JSON_SENTINAL     ((void *)(long)0x44)
+#define JSON_NO_FLAGS     (0)
+#define JSON_STRNUM_FLAG  (1)
 
 typedef enum JSON_DATA_TYPE {
     JSON_STRING,
@@ -68,7 +68,7 @@ int jsonIsBool(json *j);
 int jsonIsString(json *j);
 
 json *jsonParse(char *raw_json);
-//json *jsonParse(char *raw_json, int flags);
+// json *jsonParse(char *raw_json, int flags);
 json *jsonParseWithLen(char *raw_json, size_t buflen);
 void jsonPrint(json *J);
 void jsonRelease(json *J);

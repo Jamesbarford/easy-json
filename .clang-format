@@ -1,10 +1,12 @@
 # $FreeBSD$
+#BasedOnStyle: WebKit
 # Basic .clang-format
+  # AlignAfterOpenBracket: DontAlign
+  # AlwaysBreakAfterReturnType: TopLevelDefinitions
 ---
-BasedOnStyle: WebKit
-AlignAfterOpenBracket: DontAlign
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: true
 AlignEscapedNewlines: Left
 AlignOperands: false
 AlignTrailingComments: true
@@ -15,13 +17,11 @@ AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: InlineOnly
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
-AlwaysBreakAfterReturnType: TopLevelDefinitions
 AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: MultiLine
 BinPackArguments: true
 BinPackParameters: true
 BreakBeforeBinaryOperators: None
-BreakBeforeBraces: WebKit
 BreakBeforeTernaryOperators: false
 BreakStringLiterals: false
 # Prefer:
@@ -105,6 +105,7 @@ IndentWidth: 4
 ColumnLimit: 80
 SpaceAfterCStyleCast: false
 IncludeBlocks: Regroup
+IndentGotoLabels: false
 IncludeCategories:
   - Regex: '^\"opt_.*\.h\"'
     Priority: 1
@@ -194,3 +195,10 @@ TypenameMacros:
   - TAILQ_CLASS_HEAD
   - TAILQ_ENTRY
   - TAILQ_HEAD
+#---
+#Language: ObjectiveC
+#PointerAlignment: Right
+#ContinuationIndentWidth: 8
+#IndentWidth: 4
+#ColumnLimit: 80
+

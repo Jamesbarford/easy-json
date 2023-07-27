@@ -11,15 +11,15 @@
 
 #define isWhiteSpace(ch)                                                  \
     (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\v' || ch == '\f' || \
-            ch == '\r')
+     ch == '\r')
 #define isNum(ch) ((ch) >= '0' && (ch) <= '9')
 #define isHex(ch) \
     (isNum(ch) || ch >= 'a' && ch <= 'f' || ch >= 'A' && ch <= 'F')
-#define toInt(ch) (ch - '0')
-#define toUpper(ch) ((ch >= 'a' && ch <= 'z') ? (ch - 'a' + 'A') : ch)
-#define toHex(ch) (toUpper(ch) - 'A' + 10)
+#define toInt(ch)           (ch - '0')
+#define toUpper(ch)         ((ch >= 'a' && ch <= 'z') ? (ch - 'a' + 'A') : ch)
+#define toHex(ch)           (toUpper(ch) - 'A' + 10)
 #define isNumTerminator(ch) (ch == ',' || ch == ']' || ch == '\0' || ch == '\n')
-#define numStart(ch) (isNum(ch) || ch == '-' || ch == '+' || ch == '.')
+#define numStart(ch)        (isNum(ch) || ch == '-' || ch == '+' || ch == '.')
 
 #define debug(...)                                                         \
     do {                                                                   \
@@ -64,9 +64,7 @@ static double cache_pow10[308 + 308 + 1];
 static int has_initalised_powers = 0;
 
 /* Retrun power of 10 from the cache */
-static double
-I64Pow10(int idx)
-{
+static double I64Pow10(int idx) {
     if (idx > 308) {
         return idx;
     } else if (idx < -308) {
@@ -82,9 +80,7 @@ I64Pow10(int idx)
  */
 #if defined(__SSE2__)
 #include <emmintrin.h>
-static size_t
-getNextNonWhitespaceIdx(const char *ptr)
-{
+static size_t getNextNonWhitespaceIdx(const char *ptr) {
     char *start = (char *)ptr;
     if (isWhiteSpace(*ptr)) {
         ++ptr;
@@ -96,7 +92,7 @@ getNextNonWhitespaceIdx(const char *ptr)
      * the next boundary for the next 16-byte aligned block
      */
     const char *next_boundary = (const char *)((((size_t)ptr) + 15) &
-            ((size_t)ULLONG_MAX - 15));
+                                               ((size_t)ULLONG_MAX - 15));
 
     /* loop through characters until the next boundary, checking for whitespaces
      */
@@ -109,14 +105,14 @@ getNextNonWhitespaceIdx(const char *ptr)
     }
 
     static const char whitespaces[4][16] = {
-        { ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ' },
-        { '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n',
-                '\n', '\n', '\n', '\n', '\n' },
-        { '\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r',
-                '\r', '\r', '\r', '\r', '\r' },
-        { '\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t',
-                '\t', '\t', '\t', '\t', '\t' },
+            {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+             ' ', ' ', ' '},
+            {'\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n',
+             '\n', '\n', '\n', '\n', '\n'},
+            {'\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r', '\r',
+             '\r', '\r', '\r', '\r', '\r'},
+            {'\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t', '\t',
+             '\t', '\t', '\t', '\t', '\t'},
     };
 
     const __m128i w0 = _mm_loadu_si128((const __m128i *)(&whitespaces[0][0]));
@@ -152,9 +148,7 @@ getNextNonWhitespaceIdx(const char *ptr)
 
 #else
 /* Much simpler niave version */
-static size_t
-getNextNonWhitespaceIdx(const char *ptr)
-{
+static size_t getNextNonWhitespaceIdx(const char *ptr) {
     char *start = (char *)ptr;
     while (isWhiteSpace(*ptr)) {
         ++ptr;
@@ -166,9 +160,7 @@ getNextNonWhitespaceIdx(const char *ptr)
 /**
  * Create new json object
  */
-static json *
-jsonNew(void)
-{
+static json *jsonNew(void) {
     json *J = malloc(sizeof(json));
     J->key = NULL;
     J->type = JSON_NULL;
@@ -179,45 +171,35 @@ jsonNew(void)
 /**
  * Needs to be null checked before calling this function
  */
-static char
-jsonUnsafePeekAt(jsonParser *p, size_t idx)
-{
+static char jsonUnsafePeekAt(jsonParser *p, size_t idx) {
     return p->buffer[idx];
 }
 
 /**
  * Look at the current character
  */
-static char
-jsonPeek(jsonParser *p)
-{
+static char jsonPeek(jsonParser *p) {
     return p->buffer[p->offset];
 }
 
 /**
  * Check if we can advance the buffer by 'jmp' characters
  */
-static int
-jsonCanAdvanceBy(jsonParser *p, size_t jmp)
-{
+static int jsonCanAdvanceBy(jsonParser *p, size_t jmp) {
     return p->offset + jmp < p->buflen;
 }
 
 /**
  * Advance the offset into the buffer by 'jmp'
  */
-static void
-jsonUnsafeAdvanceBy(jsonParser *p, size_t jmp)
-{
+static void jsonUnsafeAdvanceBy(jsonParser *p, size_t jmp) {
     p->offset += jmp;
 }
 
 /**
  * Advance buffers offset
  */
-static void
-jsonAdvance(jsonParser *p)
-{
+static void jsonAdvance(jsonParser *p) {
     if (jsonCanAdvanceBy(p, 1)) {
         ++p->offset;
         return;
@@ -228,9 +210,7 @@ jsonAdvance(jsonParser *p)
 /**
  * Advance to termintor
  */
-static void
-jsonAdvanceToTerminator(jsonParser *p, char terminator)
-{
+static void jsonAdvanceToTerminator(jsonParser *p, char terminator) {
     while (jsonCanAdvanceBy(p, 1) && jsonPeek(p) != terminator) {
         ++p->offset;
     }
@@ -239,18 +219,14 @@ jsonAdvanceToTerminator(jsonParser *p, char terminator)
 /**
  * Advance past whitespace characters
  */
-static void
-jsonAdvanceWhitespace(jsonParser *p)
-{
+static void jsonAdvanceWhitespace(jsonParser *p) {
     p->offset += getNextNonWhitespaceIdx(p->buffer + p->offset);
 }
 
 /**
  * Json parser ready to rock and roll
  */
-static void
-jsonParserInit(jsonParser *p, char *buffer, size_t buflen)
-{
+static void jsonParserInit(jsonParser *p, char *buffer, size_t buflen) {
     p->offset = 0;
     p->buffer = buffer;
     p->buflen = buflen;
@@ -275,9 +251,7 @@ static void jsonParseNumber(jsonParser *p);
  * number of decimal numeric characters in the string, and the position of the
  * decimal point if present.
  */
-static int
-countMantissa(char *ptr, int *decidx)
-{
+static int countMantissa(char *ptr, int *decidx) {
     int mantissa = 0;
     *decidx = -1;
 
@@ -299,9 +273,7 @@ countMantissa(char *ptr, int *decidx)
 
 /* Get index where the number hits a terminal character &
  * a basic check for the validity of a number */
-static int
-countNumberLen(char *ptr)
-{
+static int countNumberLen(char *ptr) {
     char *start = ptr;
     int seen_e = 0;
     int seen_dec = 0;
@@ -356,9 +328,7 @@ countNumberLen(char *ptr)
     return ptr - start;
 }
 
-static long
-stringToHex(jsonParser *p)
-{
+static long stringToHex(jsonParser *p) {
     long retval = 0;
 
     while (!isNumTerminator(jsonPeek(p))) {
@@ -377,9 +347,7 @@ stringToHex(jsonParser *p)
     return retval;
 }
 
-static ssize_t
-stringToI64(jsonParser *p)
-{
+static ssize_t stringToI64(jsonParser *p) {
     ssize_t retval = 0;
     int neg = 0;
     char cur;
@@ -453,8 +421,8 @@ out:
     return retval;
 }
 
-
-static double jsonParseFloat(jsonParser *p, char *ptr, int num_len, int dec_idx, int mantissa) {
+static double jsonParseFloat(jsonParser *p, char *ptr, int num_len, int dec_idx,
+                             int mantissa) {
     int fraction_exponent, exponent, exponent_sign, neg;
 
     if (dec_idx < 0) {
@@ -600,9 +568,7 @@ static void jsonParseNumber(jsonParser *p) {
  * Convert first 4 characters of buf to a decimal
  * representation
  */
-static unsigned int
-parseHex4(const unsigned char *buf)
-{
+static unsigned int parseHex4(const unsigned char *buf) {
     unsigned int hex = 0;
     unsigned char ch;
 
@@ -629,9 +595,7 @@ parseHex4(const unsigned char *buf)
  * Encodes a codepoint into UTF-8 encoded character(s)
  * Stores result in buffer, incrementing the offset
  * */
-static void
-utf8Encode(char *buffer, unsigned int codepoint, size_t *offset)
-{
+static void utf8Encode(char *buffer, unsigned int codepoint, size_t *offset) {
     /* Check if the codepoint can be represented with a single byte (0-127) */
     if (codepoint <= 0x7F) {
         __bufput(buffer, offset, codepoint & 0xFF);
@@ -653,15 +617,13 @@ utf8Encode(char *buffer, unsigned int codepoint, size_t *offset)
     }
 }
 
-static unsigned int
-jsonParseUTF16(jsonParser *p)
-{
+static unsigned int jsonParseUTF16(jsonParser *p) {
     if (!jsonCanAdvanceBy(p, 5)) {
         p->errno = JSON_CANNOT_ADVANCE;
         return 0;
     }
-    unsigned int codepoint = parseHex4(
-            (const unsigned char *)p->buffer + p->offset + 1);
+    unsigned int codepoint = parseHex4((const unsigned char *)p->buffer +
+                                       p->offset + 1);
 
     if (codepoint == INT_MAX) {
         p->errno = JSON_INVALID_HEX;
@@ -681,7 +643,7 @@ jsonParseUTF16(jsonParser *p)
 
             jsonAdvance(p);
             if (jsonPeek(p) != '\\' &&
-                    jsonUnsafePeekAt(p, p->offset + 1) != 'u') {
+                jsonUnsafePeekAt(p, p->offset + 1) != 'u') {
                 p->errno = JSON_INVALID_UTF16;
                 return 0;
             }
@@ -717,9 +679,7 @@ jsonParseUTF16(jsonParser *p)
     return codepoint;
 }
 
-static char *
-jsonParseString(jsonParser *p)
-{
+static char *jsonParseString(jsonParser *p) {
     int run = 1;
     size_t start = p->offset;
     size_t end = p->offset;
@@ -820,9 +780,7 @@ err:
  * 0: false
  * -1: error
  */
-static int
-jsonParseBool(jsonParser *p)
-{
+static int jsonParseBool(jsonParser *p) {
     char peek = jsonPeek(p);
     int retval = -1;
 
@@ -859,9 +817,7 @@ jsonParseBool(jsonParser *p)
  * 1: success
  * -1: error
  */
-static int
-jsonParseNull(jsonParser *p)
-{
+static int jsonParseNull(jsonParser *p) {
     if (!jsonCanAdvanceBy(p, 4)) {
         p->errno = JSON_CANNOT_ADVANCE;
         return -1;
@@ -875,9 +831,7 @@ jsonParseNull(jsonParser *p)
  * Given a small amount of starting characters that JSON can be;
  * set what type is ready for the parser
  */
-static int
-jsonSetExpectedType(jsonParser *p)
-{
+static int jsonSetExpectedType(jsonParser *p) {
     char peek = jsonPeek(p);
 
     switch (peek) {
@@ -920,9 +874,7 @@ jsonSetExpectedType(jsonParser *p)
  * Parse a json object starting with '{'
  * of return NULL if the next character is '}'
  */
-static json *
-jsonParseObject(jsonParser *p)
-{
+static json *jsonParseObject(jsonParser *p) {
     /* move past '{' */
     jsonAdvance(p);
     jsonAdvanceWhitespace(p);
@@ -969,9 +921,7 @@ jsonParseObject(jsonParser *p)
  * Very similar to parsing an object where starting char is '[',
  * if array is empty return NULL
  */
-static json *
-jsonParseArray(jsonParser *p)
-{
+static json *jsonParseArray(jsonParser *p) {
     /* move past '[' */
     jsonAdvance(p);
     jsonAdvanceWhitespace(p);
@@ -1016,9 +966,7 @@ jsonParseArray(jsonParser *p)
  * Selects which parser to use depending on the type which has been set on the
  * previous parse
  */
-static int
-jsonParseValue(jsonParser *p)
-{
+static int jsonParseValue(jsonParser *p) {
     json *J = p->ptr;
 
     switch (p->type) {
@@ -1066,9 +1014,7 @@ jsonParseValue(jsonParser *p)
  * Kick off parsing by finding the first non whitespace character,
  * json has to start with either '{' or '['
  */
-static int
-__jsonParse(jsonParser *p)
-{
+static int __jsonParse(jsonParser *p) {
     jsonAdvanceWhitespace(p);
     char peek = jsonPeek(p);
     json *J = jsonNew();
@@ -1088,17 +1034,13 @@ __jsonParse(jsonParser *p)
     return p->errno == JSON_OK;
 }
 
-static void
-printDepth(int depth)
-{
+static void printDepth(int depth) {
     for (int i = 0; i < depth - 1; ++i) {
         printf("  ");
     }
 }
 
-static unsigned char *
-escapeString(char *buf)
-{
+static unsigned char *escapeString(char *buf) {
     unsigned char *outbuf = NULL;
     unsigned char *ptr = (unsigned char *)buf;
     size_t len = 0;
@@ -1169,7 +1111,7 @@ escapeString(char *buf)
                 break;
             default:
                 offset += sprintf((char *)outbuf + offset, "u%04x",
-                        (unsigned int)*ptr);
+                                  (unsigned int)*ptr);
                 break;
             }
         }
@@ -1179,9 +1121,7 @@ escapeString(char *buf)
     return outbuf;
 }
 
-static void
-printJsonKey(json *J)
-{
+static void printJsonKey(json *J) {
     if (J->key) {
         unsigned char *escape_str = escapeString(J->key);
         printf("\"%s\": ", escape_str);
@@ -1190,9 +1130,7 @@ printJsonKey(json *J)
 }
 
 /* print to stdout */
-static void
-__json_print(json *J, int depth)
-{
+static void __json_print(json *J, int depth) {
     if (J == NULL) {
         return;
     }
@@ -1268,9 +1206,7 @@ __json_print(json *J, int depth)
 /**
  * Recursively frees whole JSON object
  */
-void
-jsonRelease(json *J)
-{
+void jsonRelease(json *J) {
     json *ptr = J;
     json *next = NULL;
 
@@ -1309,9 +1245,7 @@ jsonRelease(json *J)
 }
 
 #ifdef ERROR_REPORTING
-static void
-jsonPrintError(jsonParser *p)
-{
+static void jsonPrintError(jsonParser *p) {
     char c = jsonPeek(p);
     size_t offset = p->offset;
 
@@ -1321,41 +1255,41 @@ jsonPrintError(jsonParser *p)
         break;
     case JSON_INVALID_UTF16:
         debug("Unexpected UTF16 character '%c' while parsing UTF16 at position: %zu\n",
-                c, offset);
+              c, offset);
         break;
     case JSON_INVALID_UTF16_SURROGATE:
         debug("Unexpected UTF16 surrogate character '%c' while parsing UTF16 at position: %zu\n",
-                c, offset);
+              c, offset);
         break;
     case JSON_INVALID_HEX:
         debug("Unexpected hex '%c' while parsing UTF16 at position: %zu\n", c,
-                offset);
+              offset);
         break;
     case JSON_INVALID_STRING_NOT_TERMINATED:
         debug("Expected '\"' to terminate string recieved '%c' at position: %zu",
-                c, offset);
+              c, offset);
         break;
     case JSON_INVALID_NUMBER:
         debug("Unexpected numeric character '%c' while parsing number at position: %zu\n",
-                c, offset);
+              c, offset);
         break;
     case JSON_INVALID_DECIMAL:
         debug("Unexpected decimal character '%c' while parsing number at position: %zu\n",
-                c, offset);
+              c, offset);
         break;
     case JSON_INVALID_SIGN:
         debug("Unexpected sign character '%c' while parsing number at position: %zu\n",
-                c, offset);
+              c, offset);
         break;
 
     case JSON_INVALID_BOOL:
         debug("Unexpected character '%c' while parsing boolean at position: %zu\n",
-                c, offset);
+              c, offset);
         break;
     case JSON_INVALID_JSON_TYPE_CHAR:
     case JSON_INVALID_TYPE:
         debug("Unexpected character '%c' while seeking next type to parse at position: %zu\n",
-                c, offset);
+              c, offset);
         break;
 
     case JSON_CANNOT_START_PARSE:
@@ -1368,9 +1302,7 @@ jsonPrintError(jsonParser *p)
     }
 }
 #else
-static void
-jsonPrintError(jsonParser *p)
-{
+static void jsonPrintError(jsonParser *p) {
     return;
 }
 #endif
@@ -1380,9 +1312,7 @@ jsonPrintError(jsonParser *p)
  * caller free's buffer, must pass in the length of the
  * buffer.
  */
-json *
-jsonParseWithLen(char *buffer, size_t buflen)
-{
+json *jsonParseWithLen(char *buffer, size_t buflen) {
     jsonParser p;
     jsonParserInit(&p, buffer, buflen);
     __jsonParse(&p);
@@ -1400,9 +1330,7 @@ jsonParseWithLen(char *buffer, size_t buflen)
  * caller free's buffer will call `strlen` to get the
  * length of the input buffer.
  */
-json *
-jsonParse(char *buffer)
-{
+json *jsonParse(char *buffer) {
     return jsonParseWithLen(buffer, strlen(buffer));
 }
 
@@ -1410,9 +1338,7 @@ jsonParse(char *buffer)
  * Prep cached powers of 10, needs to be called once for
  * an applications lifetime
  */
-void
-jsonInit(void)
-{
+void jsonInit(void) {
     if (!has_initalised_powers) {
         for (int exponent = -308; exponent < 309; exponent++) {
             double result = 1;
@@ -1428,54 +1354,38 @@ jsonInit(void)
 /**
  * Pretty print json to stdout
  */
-void
-jsonPrint(json *J)
-{
+void jsonPrint(json *J) {
     __json_print(J, 1);
 }
 
-int
-jsonIsObject(json *j)
-{
+int jsonIsObject(json *j) {
     return j && j->type == JSON_OBJECT;
 }
 
-int
-jsonIsArray(json *j)
-{
+int jsonIsArray(json *j) {
     return j && j->type == JSON_ARRAY;
 }
 
-int
-jsonIsNull(json *j)
-{
+int jsonIsNull(json *j) {
     return j && j->type == JSON_NULL;
 }
 
-int
-jsonIsNumber(json *j)
-{
+int jsonIsNumber(json *j) {
     return j && j->type == JSON_NUMBER;
 }
 
-int
-jsonIsBool(json *j)
-{
+int jsonIsBool(json *j) {
     return j && j->type == JSON_BOOL;
 }
 
-int
-jsonIsString(json *j)
-{
+int jsonIsString(json *j) {
     return j && j->type == JSON_STRING;
 }
 
 /**
  * Get json string value or NULL
  */
-char *
-jsonGetString(json *J)
-{
+char *jsonGetString(json *J) {
     return J->type == JSON_STRING ? J->str : NULL;
 }
 
@@ -1489,7 +1399,7 @@ ssize_t jsonGetInt(json *J) {
     return J->type == JSON_INT ? J->integer : 0;
 }
 
-/* Get string number from json object, will only be present if the json was 
+/* Get string number from json object, will only be present if the json was
  * parsed with JSON_STRNUM_FLAG
  * */
 char *jsonGetStrnum(json *J) {
@@ -1499,35 +1409,27 @@ char *jsonGetStrnum(json *J) {
 /**
  * Get json array or NULL
  */
-json *
-jsonGetArray(json *J)
-{
+json *jsonGetArray(json *J) {
     return J->type == JSON_ARRAY ? J->array : NULL;
 }
 
 /**
  * Get json object or NULL
  */
-json *
-jsonGetObject(json *J)
-{
+json *jsonGetObject(json *J) {
     return J->type == JSON_OBJECT ? J->object : NULL;
 }
 
 /**
  * Get boolean, 1 = true, 0 = false, -1 = error
  */
-int
-jsonGetBool(json *J)
-{
+int jsonGetBool(json *J) {
     return J->type == JSON_BOOL ? J->boolean : -1;
 }
 
 /**
  * Get NULL or sentinal value if not NULL
  */
-void *
-jsonGetNull(json *J)
-{
+void *jsonGetNull(json *J) {
     return J->type == JSON_NULL ? 0 : JSON_SENTINAL;
 }
