@@ -80,7 +80,7 @@ static jsonState *jsonStateNew(void) {
     return json_state;
 }
 
-static const double powers[] = {
+static const double powers_of_10[] = {
         1e+0,   1e+1,   1e+2,   1e+3,   1e+4,   1e+5,   1e+6,   1e+7,   1e+8,
         1e+9,   1e+10,  1e+11,  1e+12,  1e+13,  1e+14,  1e+15,  1e+16,  1e+17,
         1e+18,  1e+19,  1e+20,  1e+21,  1e+22,  1e+23,  1e+24,  1e+25,  1e+26,
@@ -125,7 +125,7 @@ static double I64Pow10(int idx) {
     } else if (idx < -308) {
         return 0.0;
     }
-    return powers[idx];
+    return powers_of_10[idx];
 }
 
 /**
