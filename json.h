@@ -86,7 +86,6 @@ json *jsonParse(char *raw_json);
 json *jsonParseWithFlags(char *raw_json, int flags);
 json *jsonParseWithLen(char *raw_json, size_t buflen);
 json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags);
-jsonState *jsonGetGlobalState(void);
 char *jsonGetStrerror(jsonState *state);
 void jsonPrintError(json *j);
 void jsonPrint(json *J);

@@ -70,8 +70,6 @@ typedef struct jsonParser {
     jsonState *state;
 } jsonParser;
 
-static jsonState json_global_state;
-
 static jsonState *jsonStateNew(void) {
     jsonState *json_state = malloc(sizeof(jsonState));
     json_state->error = JSON_OK;
@@ -925,20 +923,27 @@ static json *jsonParseObject(jsonParser *p) {
     /* move past '{' */
     jsonAdvance(p);
     jsonAdvanceWhitespace(p);
-
     /* Object is empty we can skip */
     if (jsonPeek(p) == '}') {
         jsonAdvance(p);
         return NULL;
     }
-
+    char ch = '\0';
+    int can_advance = 0;
     json *J;
     json *val = jsonNew();
     p->ptr = val;
 
     while (1) {
         J = p->ptr;
-        jsonAdvanceToTerminator(p, '"');
+        jsonAdvanceWhitespace(p);
+
+        if (jsonPeek(p) != '"') {
+            free(val);
+            p->errno = JSON_INVALID_JSON_TYPE_CHAR;
+            return NULL;
+        }
+
         J->key = jsonParseString(p);
         jsonAdvanceToTerminator(p, ':');
         jsonAdvance(p);
@@ -949,14 +954,23 @@ static json *jsonParseObject(jsonParser *p) {
         }
 
         jsonAdvanceWhitespace(p);
-        if (jsonPeek(p) != ',') {
-            if (jsonPeek(p) == '}' && !jsonCanAdvanceBy(p, 1)) {
+        ch = jsonPeek(p);
+
+        if (ch != ',') {
+            can_advance = jsonCanAdvanceBy(p, 1);
+            if (ch == '}' && can_advance) {
+                jsonAdvance(p);
                 break;
+            } else if (ch == '}' && !can_advance) {
+                break;
+            } else {
+                free(val);
+                p->errno = JSON_INVALID_JSON_TYPE_CHAR;
+                return NULL;
             }
-            jsonAdvance(p);
-            break;
         }
 
+        jsonAdvance(p);
         J->next = jsonNew();
         p->ptr = J->next;
     }
@@ -1276,7 +1290,7 @@ void jsonRelease(json *J) {
 static char *jsonComposeError(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    int bufferlen = 1024; /* Probably big enough */
+    int bufferlen = 2048; /* Probably big enough */
     char *str_error = malloc(sizeof(char) * bufferlen);
 
     int actual_len = vsnprintf(str_error, bufferlen, fmt, ap);
@@ -1289,7 +1303,7 @@ static char *jsonComposeError(const char *fmt, ...) {
 static char *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
     switch (error) {
     case JSON_OK:
-        return jsonComposeError("No errors");
+        return jsonComposeError("Success");
 
     case JSON_INVALID_UTF16:
         return jsonComposeError(
@@ -1327,6 +1341,11 @@ static char *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
                 ch, offset);
     case JSON_INVALID_JSON_TYPE_CHAR:
     case JSON_INVALID_TYPE:
+        if (ch == '\0') {
+            return jsonComposeError(
+                    "Unexpected NULL terminator (possible EOF) at position: %zu\n",
+                    offset);
+        }
         return jsonComposeError(
                 "Unexpected character '%c' while seeking next type to parse at position: %zu",
                 ch, offset);
@@ -1346,22 +1365,14 @@ static char *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
  * must be freed by the caller (allows it to be thread safe). It would be
  * advisable to use this for debugging purposes only as it calls malloc */
 char *jsonGetStrerror(jsonState *state) {
-    if (!state) {
-        return NULL;
-    }
     return _jsonGetStrerror(state->error, state->ch, state->offset);
 }
 
 /* Print the error to stderr */
 void jsonPrintError(json *j) {
     char *str_error = jsonGetStrerror(j->state);
-    fprintf(stderr, "%s\n", str_error);
+    fprintf(stderr, "%s<\n", str_error);
     free(str_error);
-}
-
-/* Return the global error state */
-jsonState *jsonGetGlobalState(void) {
-    return &json_global_state;
 }
 
 /**
@@ -1400,6 +1411,14 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags) {
         p.errno = JSON_CANNOT_START_PARSE;
     }
 
+    /* We only set this if there is an error to save a call to malloc */
+    if (p.errno != JSON_OK) {
+        J->state = jsonStateNew();
+        J->state->error = p.errno;
+        J->state->ch = p.buffer[p.offset];
+        printf("offset: %zu\n", p.offset);
+        J->state->offset = p.offset;
+    }
 #ifdef ERROR_REPORTING
     if (p.errno != JSON_OK) {
         char *error_buf = _jsonGetStrerror(p.errno, jsonPeek(&p), p.offset);
@@ -1408,23 +1427,7 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags) {
     }
 #endif
 
-    /* We only set this if there is an error to save a call to malloc */
-    if (p.errno != JSON_OK) {
-        /* If the flag has been set we will call malloc */
-        if (p.flags & JSON_STATE_FLAG) {
-            J->state = jsonStateNew();
-            J->state->error = p.errno;
-            J->state->ch = jsonPeek(&p);
-            J->state->offset = p.offset;
-        } else {
-            /* Set the global error state */
-            json_global_state.ch = jsonPeek(&p);
-            json_global_state.error = p.errno;
-            json_global_state.offset = p.offset;
-        }
-    }
-
-    return p.J;
+    return J;
 }
 
 /**
@@ -1438,7 +1441,7 @@ json *jsonParseWithLen(char *raw_json, size_t buflen) {
 }
 
 /**
- * Parse null terminated string buffer to a json struct. Strlen will be called
+ * Parse null terminated string buffer to a json struct strlen will be called
  * to obtain the raw json string's length. Pass in flags to modify the
  * behaviour of the parser.
  *
@@ -1453,12 +1456,13 @@ json *jsonParseWithFlags(char *raw_json, int flags) {
 }
 
 /**
- * Parse null terminated string buffer to a json struct. Strlen will be called
+ * Parse null terminated string buffer to a json struct, strlen will be called
  * to obtain the raw json string's length.
  *
  * You must free the resulting pointer with `jsonRelease`
  */
 json *jsonParse(char *raw_json) {
+    printf("len: %lu\n", strlen(raw_json));
     return jsonParseWithLen(raw_json, strlen(raw_json));
 }
 

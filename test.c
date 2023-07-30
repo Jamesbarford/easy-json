@@ -3,6 +3,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -175,9 +176,33 @@ void testParsingInts(void) {
     jsonRelease(parsed);
 }
 
+void testInvalidJson(void) {
+    int invalid_file_id = 0;
+    int file_id, len;
+    char path[2000], *raw_json;
+    json *parsed;
+    FILE *fp;
+    size_t filelen;
+
+    for (; invalid_file_id < 6; ++invalid_file_id) {
+        int file_id = invalid_file_id + 1;
+        len = snprintf(path, sizeof(path), "./test-jsons/invalid%d.json",
+                       file_id);
+        path[len] = '\0';
+        raw_json = readFile(path);
+        parsed = jsonParse(raw_json);
+        // if (parsed && parsed->state->error == JSON_OK) {
+        printf("%s\n", raw_json);
+        //}
+        parsed = NULL;
+        free(raw_json);
+    }
+}
+
 int main(void) {
     printf("Parsing floats\n");
     testParsingFloats();
     printf("Parsing ints\n");
     testParsingInts();
+    testInvalidJson();
 }
