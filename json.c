@@ -955,7 +955,6 @@ static json *jsonParseObject(jsonParser *p) {
 
         jsonAdvanceWhitespace(p);
         ch = jsonPeek(p);
-
         if (ch != ',') {
             can_advance = jsonCanAdvanceBy(p, 1);
             if (ch == '}' && can_advance) {
@@ -993,6 +992,8 @@ static json *jsonParseArray(jsonParser *p) {
         return NULL;
     }
 
+    char ch = '\0';
+    int can_advance = 0;
     json *J;
     json *val = jsonNew();
     p->ptr = val;
@@ -1006,12 +1007,19 @@ static json *jsonParseArray(jsonParser *p) {
         }
 
         jsonAdvanceWhitespace(p);
-        if (jsonPeek(p) != ',') {
-            if (jsonPeek(p) == ']' && !jsonCanAdvanceBy(p, 1)) {
+        ch = jsonPeek(p);
+        if (ch != ',') {
+            can_advance = jsonCanAdvanceBy(p, 1);
+            if (ch == ']' && can_advance) {
+                jsonAdvance(p);
                 break;
+            } else if (ch == ']' && !can_advance) {
+                break;
+            } else {
+                free(val);
+                p->errno = JSON_INVALID_JSON_TYPE_CHAR;
+                return NULL;
             }
-            jsonAdvance(p);
-            break;
         }
 
         jsonAdvance(p);
