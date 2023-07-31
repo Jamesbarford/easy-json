@@ -14,9 +14,7 @@
 
 #include "json.h"
 
-static void
-__panic(char *fmt, ...)
-{
+static void __panic(char *fmt, ...) {
     va_list va;
     char msg[1024];
 
@@ -28,9 +26,7 @@ __panic(char *fmt, ...)
     exit(EXIT_FAILURE);
 }
 
-int
-main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     FILE *fp;
     struct stat st;
     char *raw_json;
@@ -54,8 +50,6 @@ main(int argc, char **argv)
     }
 
     raw_json[st.st_size] = '\0';
-
-    jsonInit();
 
     clock_t start_parse = clock();
     json *J = jsonParse(raw_json);

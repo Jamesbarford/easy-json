@@ -100,7 +100,7 @@ I64Pow10(int idx)
     } else if (idx < -308) {
         return 0.0;
     }
-    printf("%f\n%f\n", cachePow10[idx], cachePow10[idx + 309]);
+    printf("idx:%d %f\n%f\n", idx+309, cachePow10[idx], cachePow10[idx + 309]);
     return cachePow10[idx + 309];
 }
 

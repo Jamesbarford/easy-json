@@ -1,31 +1,52 @@
 #ifndef __JSON_H
 #define __JSON_H
 
-#include <stddef.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdio.h>
 
 #define JSON_MAX_EXPONENT (511)
-#define JSON_SENTINAL ((void *)(long)0x44)
+#define JSON_SENTINAL     ((void *)(long)0x44)
+#define JSON_NO_FLAGS     (0)
+
+/* Do not parse numbers, treat them as strings */
+#define JSON_STRNUM_FLAG (1)
+/* Maintains the state of the parser, will capture errors if there are any */
+#define JSON_STATE_FLAG (2)
 
 typedef enum JSON_DATA_TYPE {
     JSON_STRING,
-    JSON_NUMBER,
+    JSON_FLOAT,
+    JSON_INT,
+    JSON_STRNUM,
     JSON_ARRAY,
     JSON_OBJECT,
     JSON_BOOL,
     JSON_NULL,
 } JSON_DATA_TYPE;
 
+typedef struct jsonState {
+    int error;
+    char ch;
+    size_t offset;
+} jsonState;
+
 typedef struct json json;
 typedef struct json {
-    JSON_DATA_TYPE type;
+    jsonState *state;
     json *next;
     char *key;
+    JSON_DATA_TYPE type;
     union {
-        char *str;
-        double num;
-        int boolean;
-        json *object;
         json *array;
+        json *object;
+        char *str;
+        int boolean;
+        char *strnum;
+        double floating;
+        ssize_t integer;
     };
 } json;
 
@@ -43,11 +64,13 @@ typedef enum JSON_ERRNO {
     JSON_INVALID_TYPE,
     JSON_CANNOT_ADVANCE,
     JSON_CANNOT_START_PARSE,
+    JSON_INVALID_KEY_TERMINATOR_CHARACTER,
+    JSON_INVALID_ARRAY_CHARACTER,
     JSON_EOF,
 } JSON_ERRNO;
 
 char *jsonGetString(json *J);
-double jsonGetNumber(json *J);
+double jsonGetFloat(json *J);
 json *jsonGetArray(json *J);
 json *jsonGetObject(json *J);
 int jsonGetBool(json *J);
@@ -56,14 +79,22 @@ void *jsonGetNull(json *J);
 int jsonIsObject(json *j);
 int jsonIsArray(json *j);
 int jsonIsNull(json *j);
-int jsonIsNumber(json *j);
 int jsonIsBool(json *j);
 int jsonIsString(json *j);
+int jsonIsInt(json *j);
+int jsonIsFloat(json *j);
 
-json *jsonParse(char *buffer);
-json *jsonParseWithLen(char *buffer, size_t buflen);
+json *jsonParse(char *raw_json);
+json *jsonParseWithFlags(char *raw_json, int flags);
+json *jsonParseWithLen(char *raw_json, size_t buflen);
+json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags);
+char *jsonGetStrerror(jsonState *state);
+void jsonPrintError(json *j);
 void jsonPrint(json *J);
 void jsonRelease(json *J);
-void jsonInit(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

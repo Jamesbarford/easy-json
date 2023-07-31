@@ -6,18 +6,16 @@
 #include "json-selector.h"
 #include "json.h"
 
-#define JSON_SEL_INVALD (0)
-#define JSON_SEL_OBJ (1)
-#define JSON_SEL_ARRAY (2)
+#define JSON_SEL_INVALD    (0)
+#define JSON_SEL_OBJ       (1)
+#define JSON_SEL_ARRAY     (2)
 #define JSON_SEL_TYPECHECK (3)
-#define JSON_SEL_MAX_BUF (256)
+#define JSON_SEL_MAX_BUF   (256)
 
 /**
  * Get item from an array of json or return null
  */
-json *
-jsonArrayAt(json *j, int idx)
-{
+json *jsonArrayAt(json *j, int idx) {
     if (!j || j->type != JSON_ARRAY) {
         return NULL;
     }
@@ -38,9 +36,7 @@ jsonArrayAt(json *j, int idx)
     return node;
 }
 
-static json *
-_jsonObjectAt(json *j, const char *name, int insensative)
-{
+static json *_jsonObjectAt(json *j, const char *name, int insensative) {
     if (j == NULL || name == NULL) {
         return NULL;
     }
@@ -65,16 +61,18 @@ _jsonObjectAt(json *j, const char *name, int insensative)
     return el;
 }
 
-static int
-jsonTypeCheck(json *j, char tk)
-{
+static int jsonTypeCheck(json *j, char tk) {
     switch (tk) {
     case 's':
         if (!jsonIsString(j))
             return 0;
         return 1;
-    case 'n':
-        if (!jsonIsNumber(j))
+    case 'i':
+        if (!jsonIsInt(j))
+            return 0;
+        return 1;
+    case 'f':
+        if (!jsonIsFloat(j))
             return 0;
         return 1;
     case 'o':
@@ -101,18 +99,14 @@ jsonTypeCheck(json *j, char tk)
 /**
  * Get from an object if the key matches the name - case sensitive
  */
-json *
-jsonObjectAtCaseSensitive(json *j, const char *name)
-{
+json *jsonObjectAtCaseSensitive(json *j, const char *name) {
     return _jsonObjectAt(j, name, 0);
 }
 
 /**
  * Get from an object if the key matches the name - case insensitive
  */
-json *
-jsonObjectAtCaseInSensitive(json *j, const char *name)
-{
+json *jsonObjectAtCaseInSensitive(json *j, const char *name) {
     return _jsonObjectAt(j, name, 1);
 }
 
@@ -137,15 +131,14 @@ jsonObjectAtCaseInSensitive(json *j, const char *name)
  *    ":<type>" checks if the currently selected type is of the specified type,
  *              where the type can be a single letter representing:
  *      "s" -> string
- *      "n" -> number
+ *      "f" -> float
+ *      "i" -> int
  *      "a" -> array
  *      "o" -> object
  *      "b" -> boolean
  *      "!" -> null
  */
-json *
-jsonSelect(json *j, const char *fmt, ...)
-{
+json *jsonSelect(json *j, const char *fmt, ...) {
     /**
      * Heavily inspired by:
      * https://github.com/antirez/stonky/blob/main/stonky.c
