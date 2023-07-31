@@ -940,7 +940,7 @@ static json *jsonParseObject(jsonParser *p) {
 
         if (jsonPeek(p) != '"') {
             free(val);
-            p->errno = JSON_INVALID_JSON_TYPE_CHAR;
+            p->errno = JSON_INVALID_KEY_TERMINATOR_CHARACTER;
             return NULL;
         }
 
@@ -1017,7 +1017,7 @@ static json *jsonParseArray(jsonParser *p) {
                 break;
             } else {
                 free(val);
-                p->errno = JSON_INVALID_JSON_TYPE_CHAR;
+                p->errno = JSON_INVALID_ARRAY_CHARACTER;
                 return NULL;
             }
         }
@@ -1343,10 +1343,21 @@ static char *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
                 "Unexpected sign character '%c' while parsing number at position: %zu",
                 ch, offset);
 
+    case JSON_INVALID_KEY_TERMINATOR_CHARACTER:
+        return jsonComposeError(
+                "Unexpected character '%c' while parsing object key at position: %zu",
+                ch, offset);
+
+    case JSON_INVALID_ARRAY_CHARACTER:
+        return jsonComposeError(
+                "Unexpected character '%c' while parsing array at position: %zu",
+                ch, offset);
+
     case JSON_INVALID_BOOL:
         return jsonComposeError(
                 "Unexpected character '%c' while parsing boolean at position: %zu",
                 ch, offset);
+
     case JSON_INVALID_JSON_TYPE_CHAR:
     case JSON_INVALID_TYPE:
         if (ch == '\0') {
@@ -1424,9 +1435,9 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags) {
         J->state = jsonStateNew();
         J->state->error = p.errno;
         J->state->ch = p.buffer[p.offset];
-        printf("offset: %zu\n", p.offset);
         J->state->offset = p.offset;
     }
+
 #ifdef ERROR_REPORTING
     if (p.errno != JSON_OK) {
         char *error_buf = _jsonGetStrerror(p.errno, jsonPeek(&p), p.offset);
@@ -1470,7 +1481,6 @@ json *jsonParseWithFlags(char *raw_json, int flags) {
  * You must free the resulting pointer with `jsonRelease`
  */
 json *jsonParse(char *raw_json) {
-    printf("len: %lu\n", strlen(raw_json));
     return jsonParseWithLen(raw_json, strlen(raw_json));
 }
 
