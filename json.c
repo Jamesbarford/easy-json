@@ -792,6 +792,9 @@ static char *jsonParseString(jsonParser *p) {
                 utf8Encode(str, codepoint, &len);
                 break;
             }
+            default:
+                p->errno = JSON_INVALID_ESCAPE_CHARACTER;
+                goto err;
             }
             break;
         case '"':
@@ -1352,6 +1355,11 @@ static char *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
         return jsonComposeError(
                 "Unexpected character '%c' while parsing array at position: %zu",
                 ch, offset);
+
+    case JSON_INVALID_ESCAPE_CHARACTER:
+        return jsonComposeError(
+                "Invalid JSON escape character '%c' at position: %zu", ch,
+                offset);
 
     case JSON_INVALID_BOOL:
         return jsonComposeError(
