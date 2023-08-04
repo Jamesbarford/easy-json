@@ -1,5 +1,12 @@
 # Easy JSON
-Easy JSON is a lightweight and fast JSON parser with an emphasis on ease of use for parsing and accessing properties in the parsed JSON. There is optional error handling and reporting suitable for use with multiple threads, achieved by using malloc & free though is not required if you do not require it. A speed increase has been obtained by some experimentation with the 'Streaming SIMD Extensions 2' (`__SSE2__`). With the usage of `SIMD` for skipping whitespace it is in some instances faster than `cJSON` especially when used on large JSON files. On small JSON files the speed is much the same.
+Easy JSON is a lightweight and fast JSON parser with an emphasis on ease of use 
+for parsing and accessing properties in the parsed JSON. There is optional error 
+handling and reporting suitable for use with multiple threads, achieved by using 
+malloc & free though is not required if you do not require it. A speed increase 
+has been obtained by some experimentation with the 'Streaming SIMD Extensions 2' 
+(`__SSE2__`). With the usage of `SIMD` for skipping whitespace it is in some 
+instances faster than `cJSON` especially when used on large JSON files. 
+On small JSON files the speed is much the same.
 
 # Usage
 ## Simple Parsing
@@ -21,8 +28,12 @@ int main(void) {
 ```
 
 ## Accessing properties on the JSON struct
-This allows for `jq` like expressions to select properties from json, this makes accessing properties on the json object much easier. It is heavily inspired by [antirez project](https://github.com/antirez/stonky/blob/main/stonky.c) with adaptations to make it suitable for use with this parser.
-It is provided as a separate file in `json-selector.c` so if you don't require it you are not forced to use it.
+This allows for `jq` like expressions to select properties from json, this makes 
+accessing properties on the json object much easier. It is heavily inspired by 
+[antirez project](https://github.com/antirez/stonky/blob/main/stonky.c) with 
+adaptations to make it suitable for use with this parser. It is provided as a 
+separate file in `json-selector.c` so if you don't require it you are not 
+forced to use it.
 
 ```c
 #include "json.h"

@@ -1,6 +1,6 @@
 TARGET := parser 
 CC     := gcc
-CFLAGS := -Wall -O2 -DERROR_REPORTING
+CFLAGS := -Wall -O2 
 TESTS  := tests
 
 all: $(TARGET) $(TESTS)

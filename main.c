@@ -60,6 +60,7 @@ int main(int argc, char **argv) {
     free(raw_json);
     jsonPrint(J);
 
+    printf("%s\n", jsonToString(J, NULL));
     clock_t start_free = clock();
     jsonRelease(J);
     clock_t end_free = clock();
