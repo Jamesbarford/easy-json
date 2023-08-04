@@ -1594,7 +1594,8 @@ static jsonString *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
  * advisable to use this for debugging purposes only as it calls malloc */
 char *jsonGetStrerror(json *J) {
     if (J->state) {
-        jsonString *js = _jsonGetStrerror(J->state->error, J->state->ch, J->state->offset);
+        jsonString *js = _jsonGetStrerror(J->state->error, J->state->ch,
+                                          J->state->offset);
         char *buffer = js->buffer;
         free(js);
         return buffer;
@@ -1603,7 +1604,7 @@ char *jsonGetStrerror(json *J) {
 }
 
 /* Print the error to stderr */
-void jsonPrintError(json * J) {
+void jsonPrintError(json *J) {
     char *str_error = jsonGetStrerror(J);
     if (str_error) {
         fprintf(stderr, "%s\n", str_error);
