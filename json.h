@@ -85,12 +85,14 @@ int jsonIsString(json *j);
 int jsonIsInt(json *j);
 int jsonIsFloat(json *j);
 
+char *jsonToString(json *j, size_t *len);
+
 json *jsonParse(char *raw_json);
 json *jsonParseWithFlags(char *raw_json, int flags);
 json *jsonParseWithLen(char *raw_json, size_t buflen);
 json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags);
-char *jsonGetStrerror(jsonState *state);
-void jsonPrintError(json *j);
+char *jsonGetStrerror(json *J);
+void jsonPrintError(json *J);
 void jsonPrint(json *J);
 void jsonRelease(json *J);
 

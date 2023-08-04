@@ -41,6 +41,7 @@ char *readFile(char *path) {
         panic("Failed to read file: %s\n", strerror(errno));
     }
 
+    close(fd);
     return buffer;
 }
 
@@ -184,7 +185,6 @@ typedef struct invalidJson {
 void testInvalidJson(void) {
     char *raw_json;
     json *parsed;
-    FILE *fp;
 
     invalidJson test_cases[] = {
             {JSON_INVALID_KEY_TERMINATOR_CHARACTER,
@@ -209,6 +209,41 @@ void testInvalidJson(void) {
     }
 }
 
+void testParseThenToStringAndBack(void) {
+    char *raw_json, *jsonstring;
+    json *parsed;
+    size_t len;
+    int fd;
+
+    raw_json = readFile("./test-jsons/sample.json");
+    parsed = jsonParse(raw_json);
+    testCondition(parsed->state == NULL);
+    test("  Parse json\n");
+
+    jsonstring = jsonToString(parsed, &len);
+    testCondition(jsonstring != NULL);
+    test("  Back to string\n");
+
+    fd = open("again.json", O_RDWR|O_TRUNC, 0666);
+    if (fd) {
+        write(fd, jsonstring, len);
+        close(fd);
+    }
+
+    jsonRelease(parsed);
+
+    parsed = jsonParse(jsonstring);
+    testCondition(parsed->state == NULL);
+    if (parsed->state) {
+        jsonPrintError(parsed);
+    }
+    test("  Parse json string\n");
+
+    free(parsed);
+    free(jsonstring);
+    free(raw_json);
+}
+
 int main(void) {
     printf("Parsing floats\n");
     testParsingFloats();
@@ -216,4 +251,6 @@ int main(void) {
     testParsingInts();
     printf("Invalid JSON\n");
     testInvalidJson();
+    printf("Parse JSON, then to string, then parse the string\n");
+    testParseThenToStringAndBack();
 }
