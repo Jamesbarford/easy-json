@@ -224,12 +224,6 @@ void testParseThenToStringAndBack(void) {
     testCondition(jsonstring != NULL);
     test("  Back to string\n");
 
-    fd = open("again.json", O_RDWR|O_TRUNC, 0666);
-    if (fd) {
-        write(fd, jsonstring, len);
-        close(fd);
-    }
-
     jsonRelease(parsed);
 
     parsed = jsonParse(jsonstring);
