@@ -91,7 +91,7 @@ typedef struct jsonString {
 jsonString *jsonStringNew(void) {
     jsonString *jsb = malloc(sizeof(jsonString));
     jsb->len = 0;
-    jsb->capacity = 4096;
+    jsb->capacity = 128;
     jsb->buffer = malloc(sizeof(char) * jsb->capacity);
     return jsb;
 }
@@ -137,7 +137,7 @@ static void jsonStringCatf(jsonString *js, const char *fmt, ...) {
     va_list ap, copy;
     va_start(ap, fmt);
 
-    size_t min_len = 4096;
+    size_t min_len = 128;
     size_t bufferlen = strlen(fmt) * 3;
     size_t len = 0;
     bufferlen = bufferlen > min_len ? bufferlen : min_len;
