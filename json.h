@@ -75,13 +75,13 @@ typedef enum JSON_ERRNO {
     JSON_EOF,
 } JSON_ERRNO;
 
-char *jsonGetString(json *J);
-double jsonGetFloat(json *J);
-ssize_t jsonGetInt(json *J);
-json *jsonGetArray(json *J);
 json *jsonGetObject(json *J);
-int jsonGetBool(json *J);
+json *jsonGetArray(json *J);
 void *jsonGetNull(json *J);
+int jsonGetBool(json *J);
+char *jsonGetString(json *J);
+ssize_t jsonGetInt(json *J);
+double jsonGetFloat(json *J);
 
 int jsonIsObject(json *j);
 int jsonIsArray(json *j);

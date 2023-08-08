@@ -10,8 +10,8 @@ JSON parsing simplified.
 
 Easy JSON is a lightweight and fast JSON parser with an emphasis on ease of use 
 for parsing and accessing properties in the parsed JSON. I was wanting something
-that had a small surface area, solid error handling with clear errors and a `jq`
-like syntax for simplifying accessing properties off JSON.
+that had a small surface area, solid error handling and a `jq` like syntax for 
+simplifying accessing properties off JSON.
 
 The is error handling and reporting suitable for use with multiple threads as
 The error state is unique per parsed JSON. Thus if you are parsing mulitple 
@@ -52,6 +52,32 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags);
 ### Flags
 - `JSON_STRNUM_FLAG` is avalible for parsing both floats and integers as 
   strings.
+
+## Getters & Typechecking
+The following will return `1` if the `json *` is not `NULL` and there is a match
+on the type:
+
+```c
+int jsonIsObject(json *j);
+int jsonIsArray(json *j);
+int jsonIsNull(json *j);
+int jsonIsBool(json *j);
+int jsonIsString(json *j);
+int jsonIsInt(json *j);
+int jsonIsFloat(json *j);
+```
+
+And the following for getting a value from a `json *`:
+
+```c
+json *jsonGetObject(json *J);
+json *jsonGetArray(json *J);
+void *jsonGetNull(json *J);
+int jsonGetBool(json *J);
+char *jsonGetString(json *J);
+ssize_t jsonGetInt(json *J);
+double jsonGetFloat(json *J);
+```
 
 ### NULL
 A legitimate JSON NULL is parsed to `JSON_SENTINAL` not c's `NULL`. You can use
