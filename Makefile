@@ -12,9 +12,10 @@ format:
 $(TARGET): main.c json.c json-selector.c
 	$(CC) $(CFLAGS) -o $@ $^ 
 
-$(TESTS): test.c json.c
+$(TESTS): test.c json.c json-selector.c
 	$(CC) $(CFLAGS) -o $@ $^ 
 
 
 clean:
 	rm -rf $(TARGET)
+	rm -rf $(TESTS)

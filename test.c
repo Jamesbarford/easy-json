@@ -1,3 +1,9 @@
+/* Copyright (C) 2023 James W M Barford-Evans
+ * <jamesbarfordevans at gmail dot com>
+ * All Rights Reserved
+ *
+ * This code is released under the BSD 2 clause license.
+ * See the COPYING file for more information. */
 #include <errno.h>
 #include <fcntl.h>
 #include <float.h>
@@ -9,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "json-selector.h"
 #include "json.h"
 
 void panic(char *fmt, ...) {
@@ -50,7 +57,7 @@ int floatEqual(double a, double b) {
     return (fabsl(a - b) <= max_val * DBL_EPSILON);
 }
 
-static int tests = 0, fails = 0, skipped = 0;
+static int tests = 0, fails = 0;
 
 #define test(...)                  \
     {                              \
@@ -58,12 +65,12 @@ static int tests = 0, fails = 0, skipped = 0;
         printf(__VA_ARGS__);       \
     }
 
-#define testCondition(passed)                 \
-    if (passed)                               \
-        printf("\033[0;32mPASSED\033[0;0m "); \
-    else {                                    \
-        printf("\033[0;31mFAILED\033[0;0m "); \
-        fails++;                              \
+#define testCondition(passed)                   \
+    if (passed)                                 \
+        printf("  \033[0;32mPASSED\033[0;0m "); \
+    else {                                      \
+        printf("  \033[0;31mFAILED\033[0;0m "); \
+        fails++;                                \
     }
 
 void testParsingFloats(void) {
@@ -105,8 +112,8 @@ void testParsingFloats(void) {
     test("  Parsing %s\n", float_5);
     jsonRelease(parsed);
 
-    parsed = jsonParseWithFlags(float_6, JSON_STATE_FLAG);
-    testCondition(parsed->state->error == JSON_INVALID_NUMBER);
+    parsed = jsonParse(float_6);
+    testCondition(jsonGetError(parsed) == JSON_INVALID_NUMBER);
     test("  Parsing %s\n", float_6);
     jsonRelease(parsed);
 
@@ -213,11 +220,11 @@ void testParseThenToStringAndBack(void) {
     char *raw_json, *jsonstring;
     json *parsed;
     size_t len;
-    int fd;
+    int ok;
 
     raw_json = readFile("./test-jsons/sample.json");
     parsed = jsonParse(raw_json);
-    testCondition(parsed->state == NULL);
+    testCondition(jsonOk(parsed));
     test("  Parse json\n");
 
     jsonstring = jsonToString(parsed, &len);
@@ -225,17 +232,82 @@ void testParseThenToStringAndBack(void) {
     test("  Back to string\n");
 
     jsonRelease(parsed);
-
     parsed = jsonParse(jsonstring);
-    testCondition(parsed->state == NULL);
-    if (parsed->state) {
+    ok = jsonOk(parsed);
+    testCondition(ok);
+    if (!ok) {
         jsonPrintError(parsed);
     }
     test("  Parse json string\n");
 
-    free(parsed);
+    jsonRelease(parsed);
     free(jsonstring);
     free(raw_json);
+}
+
+int safeStrcmp(char *s1, char *s2) {
+    if (s1 == NULL && s2 == NULL) {
+        return 1;
+    }
+    if ((s1 == NULL && s2 != NULL) || (s2 == NULL && s1 != NULL)) {
+        return 0;
+    }
+    return !strcmp(s1, s2);
+}
+
+void testJsonSelector(void) {
+    char *raw_json = readFile("./test-jsons/massive.json");
+    json *j = jsonParse(raw_json);
+    json *sel = NULL;
+    char *expected_emails[] = {
+            "Jane Doe",
+            "John Smith",
+    };
+    int arr_len = sizeof(expected_emails) / sizeof(expected_emails[0]);
+
+    if (!jsonOk(j)) {
+        jsonPrintError(j);
+        panic("Failed to parse JSON\n");
+    }
+
+    sel = jsonSelect(j, ".person.name.first");
+    testCondition(safeStrcmp(jsonGetString(sel), "John"));
+    test("  .person.name.first == \"John\"\n");
+
+    sel = jsonSelect(j, ".person.name.middle.nicknames[1]:s");
+    testCondition(safeStrcmp(jsonGetString(sel), "JD"));
+    test("  .person.name.middle.nicknames[1]:s == \"JD\"\n");
+
+    sel = jsonSelect(j, ".person.phoneNumbers[*].callHistory[*].direction:s", 2,
+                     0);
+    testCondition(safeStrcmp(jsonGetString(sel), "incoming"));
+    test("  .person.phoneNumbers[*].callHistory[*].direction:s == \"incoming\"\n");
+
+    sel = jsonSelect(j, ".person.bools[3]:b");
+    testCondition(sel->boolean == 0);
+    test("  .person.bools[3]:b == false\n");
+
+    for (int i = 0; i < arr_len; ++i) {
+        sel = jsonSelect(j, ".person.email.mailbox.inbox[*].sender", i);
+        testCondition(safeStrcmp(jsonGetString(sel), expected_emails[i]));
+        test("  .person.email.mailbox.inbox[*] == %s\n", expected_emails[i]);
+    }
+    sel = jsonSelect(j, ".person.misc");
+    testCondition(jsonIsNull(sel));
+    test("  .person.misc == JSON_SENTINAL\n");
+
+    sel = jsonSelect(j, "foo");
+    testCondition(sel == NULL);
+    test("  invalid selection 1 foo\n");
+
+    sel = jsonSelect(j, ".[12][21][21][21]");
+    testCondition(sel == NULL);
+    test("  invalid selection 2 .[12][21][21][21]\n");
+
+    sel = jsonSelect(j, ".person.cats");
+    testCondition(sel == NULL);
+    test("  invalid selection 3 .person.cats\n");
+    jsonRelease(j);
 }
 
 int main(void) {
@@ -247,4 +319,6 @@ int main(void) {
     testInvalidJson();
     printf("Parse JSON, then to string, then parse the string\n");
     testParseThenToStringAndBack();
+    printf("jsonSelect\n");
+    testJsonSelector();
 }

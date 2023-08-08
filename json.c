@@ -1,3 +1,9 @@
+/* Copyright (C) 2023 James W M Barford-Evans
+ * <jamesbarfordevans at gmail dot com>
+ * All Rights Reserved
+ *
+ * This code is released under the BSD 2 clause license.
+ * See the COPYING file for more information. */
 #include <limits.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -72,7 +78,7 @@ typedef struct jsonParser {
     jsonState *state;
 } jsonParser;
 
-typedef struct jsonStringBuffer {
+typedef struct jsonString {
     char *buffer;
     size_t capacity;
     size_t len;
@@ -85,7 +91,7 @@ typedef struct jsonStringBuffer {
 jsonString *jsonStringNew(void) {
     jsonString *jsb = malloc(sizeof(jsonString));
     jsb->len = 0;
-    jsb->capacity = 512;
+    jsb->capacity = 4096;
     jsb->buffer = malloc(sizeof(char) * jsb->capacity);
     return jsb;
 }
@@ -97,30 +103,25 @@ void jsonStringRelease(jsonString *js) {
     }
 }
 
-/* Grow the capacity of the string buffer by `additional` space */
-static int jsonStringExtendBuffer(jsonString *js, unsigned int additional) {
-    size_t new_capacity = js->capacity + additional;
-    if (new_capacity <= js->capacity) {
-        return -1;
-    }
-
-    char *_str = js->buffer;
-    char *tmp = (char *)realloc(_str, new_capacity);
-
-    if (tmp == NULL) {
-        return 0;
-    }
-    js->buffer = tmp;
-    js->capacity = new_capacity;
-
-    return 1;
-}
-
 /* Only extend the buffer if the additional space required would overspill the
  * current allocated capacity of the buffer */
 static int jsonStringExtendBufferIfNeeded(jsonString *js, size_t additional) {
     if ((js->len + 1 + additional) >= js->capacity) {
-        return jsonStringExtendBuffer(js, additional > 256 ? additional : 256);
+        size_t new_capacity = (js->capacity + additional) * 2;
+        if (new_capacity <= js->capacity) {
+            return -1;
+        }
+
+        char *_str = js->buffer;
+        char *tmp = (char *)realloc(_str, new_capacity);
+
+        if (tmp == NULL) {
+            return 0;
+        }
+        js->buffer = tmp;
+        js->capacity = new_capacity;
+
+        return 1;
     }
     return 0;
 }
@@ -132,24 +133,24 @@ static void jsonStringCatLen(jsonString *js, const void *d, size_t len) {
     js->buffer[js->len] = '\0';
 }
 
-static void jsonStringCat(jsonString *js, const char *fmt, ...) {
+static void jsonStringCatf(jsonString *js, const char *fmt, ...) {
     va_list ap, copy;
     va_start(ap, fmt);
 
-    /* Probably big enough */
-    int min_len = 512;
-    int bufferlen = strlen(fmt) * 3;
+    size_t min_len = 4096;
+    size_t bufferlen = strlen(fmt) * 3;
+    size_t len = 0;
     bufferlen = bufferlen > min_len ? bufferlen : min_len;
     char *buf = (char *)malloc(sizeof(char) * bufferlen);
 
     while (1) {
-        buf[bufferlen - 2] = '\0';
         va_copy(copy, ap);
-        vsnprintf(buf, bufferlen, fmt, ap);
+        len = vsnprintf(buf, bufferlen, fmt, copy);
         va_end(copy);
-        if (buf[bufferlen - 2] != '\0') {
+
+        if (len >= bufferlen) {
             free(buf);
-            bufferlen *= 2;
+            bufferlen = len + 1;
             buf = malloc(bufferlen);
             if (buf == NULL) {
                 return;
@@ -159,7 +160,7 @@ static void jsonStringCat(jsonString *js, const char *fmt, ...) {
         break;
     }
 
-    jsonStringCatLen(js, buf, strlen(buf));
+    jsonStringCatLen(js, buf, len);
     free(buf);
     va_end(ap);
 }
@@ -167,7 +168,7 @@ static void jsonStringCat(jsonString *js, const char *fmt, ...) {
 static void jsonConcatKey(json *J, jsonString *js) {
     if (J->key) {
         unsigned char *escape_str = escapeString(J->key);
-        jsonStringCat(js, "\"%s\":", J->key);
+        jsonStringCatf(js, "\"%s\":", J->key);
         free(escape_str);
     }
 }
@@ -182,23 +183,23 @@ static void _jsonToString(json *J, jsonString *js) {
         switch (J->type) {
         case JSON_INT:
             jsonConcatKey(J, js);
-            jsonStringCat(js, "%ld", J->integer);
+            jsonStringCatf(js, "%ld", J->integer);
             break;
 
         case JSON_FLOAT:
             jsonConcatKey(J, js);
-            jsonStringCat(js, "%1.17g", J->floating);
+            jsonStringCatf(js, "%1.17g", J->floating);
             break;
 
         case JSON_STRNUM:
             jsonConcatKey(J, js);
-            jsonStringCat(js, "%s", J->strnum);
+            jsonStringCatf(js, "%s", J->strnum);
             break;
 
         case JSON_STRING:
             jsonConcatKey(J, js);
             unsigned char *escape_str = escapeString(J->str);
-            jsonStringCat(js, "\"%s\"", (char *)J->str);
+            jsonStringCatf(js, "\"%s\"", (char *)J->str);
             free(escape_str);
             break;
 
@@ -298,7 +299,7 @@ static const double powers_of_10[] = {
         1e+306, 1e+307, 1e+308,
 };
 
-/* Retrun power of 10 from the cache */
+/* Retun power of 10 from the cache */
 static double I64Pow10(int idx) {
     if (idx > 308) {
         return idx;
@@ -1131,6 +1132,12 @@ static json *jsonParseObject(jsonParser *p) {
 
         J->key = jsonParseString(p);
         jsonAdvanceToTerminator(p, ':');
+        if (jsonPeek(p) != ':') {
+            free(val);
+            p->errno = JSON_INVALID_KEY_TERMINATOR_CHARACTER;
+            return NULL;
+        }
+
         jsonAdvance(p);
         jsonAdvanceWhitespace(p);
 
@@ -1437,7 +1444,7 @@ static void __json_print(json *J, int depth) {
  * Recursively frees whole JSON object
  */
 void jsonRelease(json *J) {
-    if (!J) {
+    if (J == NULL) {
         return;
     }
     json *ptr = J;
@@ -1452,21 +1459,24 @@ void jsonRelease(json *J) {
         switch (ptr->type) {
 
         case JSON_STRNUM:
-            free(ptr->strnum);
+            if (ptr->strnum) {
+                free(ptr->strnum);
+            }
             break;
 
         case JSON_STRING:
-            free(ptr->str);
+            if (ptr->str) {
+                free(ptr->str);
+            }
             break;
 
         case JSON_ARRAY:
             jsonRelease(ptr->array);
             break;
 
-        case JSON_OBJECT: {
+        case JSON_OBJECT:
             jsonRelease(ptr->object);
             break;
-        }
 
         case JSON_FLOAT:
         case JSON_INT:
@@ -1484,78 +1494,86 @@ static jsonString *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
     jsonString *js = jsonStringNew();
     switch (error) {
     case JSON_OK:
-        jsonStringCat(js, "Success");
+        jsonStringCatf(js, "Success");
         break;
 
     case JSON_INVALID_UTF16:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected UTF16 character '%c' while parsing UTF16 at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_UTF16_SURROGATE:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected UTF16 surrogate character '%c' while parsing UTF16 at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_HEX:
-        jsonStringCat(
+        jsonStringCatf(
                 js, "Unexpected hex '%c' while parsing UTF16 at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_STRING_NOT_TERMINATED:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Expected '\"' to terminate string recieved '%c' at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_NUMBER:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected numeric character '%c' while parsing number at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_DECIMAL:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected decimal character '%c' while parsing number at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_SIGN:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected sign character '%c' while parsing number at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_KEY_TERMINATOR_CHARACTER:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected character '%c' while parsing object key at position: %zu",
                 ch, offset);
         break;
 
+    case JSON_INVALID_KEY_VALUE_SEPARATOR:
+        jsonStringCatf(
+                js,
+                "Unexpected character '%c' while parsing key value separator at position: %zu",
+                ch, offset);
+        break;
+
     case JSON_INVALID_ARRAY_CHARACTER:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected character '%c' while parsing array at position: %zu",
                 ch, offset);
         break;
 
     case JSON_INVALID_ESCAPE_CHARACTER:
-        jsonStringCat(js, "Invalid JSON escape character '%c' at position: %zu",
-                      ch, offset);
+        jsonStringCatf(js,
+                       "Invalid JSON escape character '%c' at position: %zu",
+                       ch, offset);
         break;
 
     case JSON_INVALID_BOOL:
-        jsonStringCat(
+        jsonStringCatf(
                 js,
                 "Unexpected character '%c' while parsing boolean at position: %zu",
                 ch, offset);
@@ -1564,12 +1582,12 @@ static jsonString *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
     case JSON_INVALID_JSON_TYPE_CHAR:
     case JSON_INVALID_TYPE:
         if (ch == '\0') {
-            jsonStringCat(
+            jsonStringCatf(
                     js,
                     "Unexpected NULL terminator (possible EOF) at position: %zu\n",
                     offset);
         } else {
-            jsonStringCat(
+            jsonStringCatf(
                     js,
                     "Unexpected character '%c' while seeking next type to parse at position: %zu",
                     ch, offset);
@@ -1577,13 +1595,13 @@ static jsonString *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
         break;
 
     case JSON_CANNOT_START_PARSE:
-        jsonStringCat(js, "JSON must start with '[' or '{', at position: %zu",
-                      offset);
+        jsonStringCatf(js, "JSON must start with '[' or '{', at position: %zu",
+                       offset);
         break;
     case JSON_CANNOT_ADVANCE:
     case JSON_EOF:
-        jsonStringCat(js, "Unexpected end of json buffer at position: %zu",
-                      offset);
+        jsonStringCatf(js, "Unexpected end of json buffer at position: %zu",
+                       offset);
         break;
     }
     return js;
@@ -1593,7 +1611,7 @@ static jsonString *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
  * must be freed by the caller (allows it to be thread safe). It would be
  * advisable to use this for debugging purposes only as it calls malloc */
 char *jsonGetStrerror(json *J) {
-    if (J->state) {
+    if (!jsonOk(J)) {
         jsonString *js = _jsonGetStrerror(J->state->error, J->state->ch,
                                           J->state->offset);
         char *buffer = js->buffer;
@@ -1650,13 +1668,10 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags) {
         p.errno = JSON_CANNOT_START_PARSE;
     }
 
-    /* We only set this if there is an error to save a call to malloc */
-    if (p.errno != JSON_OK) {
-        J->state = jsonStateNew();
-        J->state->error = p.errno;
-        J->state->ch = p.buffer[p.offset];
-        J->state->offset = p.offset;
-    }
+    J->state = jsonStateNew();
+    J->state->error = p.errno;
+    J->state->ch = p.buffer[p.offset];
+    J->state->offset = p.offset;
 
 #ifdef ERROR_REPORTING
     if (p.errno != JSON_OK) {
@@ -1743,50 +1758,64 @@ int jsonIsFloat(json *j) {
  * Get json string value or NULL
  */
 char *jsonGetString(json *J) {
-    return J->type == JSON_STRING ? J->str : NULL;
+    return J && J->type == JSON_STRING ? J->str : NULL;
 }
 
 /* Get float from json object */
 double jsonGetFloat(json *J) {
-    return J->type == JSON_FLOAT ? J->floating : 0.0;
+    return J && J->type == JSON_FLOAT ? J->floating : 0.0;
 }
 
 /* Get int from json object */
 ssize_t jsonGetInt(json *J) {
-    return J->type == JSON_INT ? J->integer : 0;
+    return J && J->type == JSON_INT ? J->integer : 0;
 }
 
 /* Get string number from json object, will only be present if the json was
  * parsed with JSON_STRNUM_FLAG
  * */
 char *jsonGetStrnum(json *J) {
-    return J->type == JSON_STRNUM ? J->strnum : NULL;
+    return J && J->type == JSON_STRNUM ? J->strnum : NULL;
 }
 
 /**
  * Get json array or NULL
  */
 json *jsonGetArray(json *J) {
-    return J->type == JSON_ARRAY ? J->array : NULL;
+    return J && J->type == JSON_ARRAY ? J->array : NULL;
 }
 
 /**
  * Get json object or NULL
  */
 json *jsonGetObject(json *J) {
-    return J->type == JSON_OBJECT ? J->object : NULL;
+    return J && J->type == JSON_OBJECT ? J->object : NULL;
 }
 
 /**
  * Get boolean, 1 = true, 0 = false, -1 = error
  */
 int jsonGetBool(json *J) {
-    return J->type == JSON_BOOL ? J->boolean : -1;
+    return J && J->type == JSON_BOOL ? J->boolean : -1;
 }
 
 /**
  * Get NULL or sentinal value if not NULL
  */
 void *jsonGetNull(json *J) {
-    return J->type == JSON_NULL ? 0 : JSON_SENTINAL;
+    return J && J->type == JSON_NULL ? 0 : JSON_SENTINAL;
+}
+
+/**
+ * Get error code for json
+ */
+int jsonGetError(json *J) {
+    return J->state->error;
+}
+
+/**
+ * Is the json valid
+ */
+int jsonOk(json *J) {
+    return jsonGetError(J) == JSON_OK;
 }

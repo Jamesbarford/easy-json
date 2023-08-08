@@ -1,3 +1,9 @@
+/* Copyright (C) 2023 James W M Barford-Evans
+ * <jamesbarfordevans at gmail dot com>
+ * All Rights Reserved
+ *
+ * This code is released under the BSD 2 clause license.
+ * See the COPYING file for more information. */
 #ifndef __JSON_H
 #define __JSON_H
 
@@ -13,8 +19,6 @@ extern "C" {
 
 /* Do not parse numbers, treat them as strings */
 #define JSON_STRNUM_FLAG (1)
-/* Maintains the state of the parser, will capture errors if there are any */
-#define JSON_STATE_FLAG (2)
 
 typedef enum JSON_DATA_TYPE {
     JSON_STRING,
@@ -65,6 +69,7 @@ typedef enum JSON_ERRNO {
     JSON_CANNOT_ADVANCE,
     JSON_CANNOT_START_PARSE,
     JSON_INVALID_KEY_TERMINATOR_CHARACTER,
+    JSON_INVALID_KEY_VALUE_SEPARATOR,
     JSON_INVALID_ARRAY_CHARACTER,
     JSON_INVALID_ESCAPE_CHARACTER,
     JSON_EOF,
@@ -72,6 +77,7 @@ typedef enum JSON_ERRNO {
 
 char *jsonGetString(json *J);
 double jsonGetFloat(json *J);
+ssize_t jsonGetInt(json *J);
 json *jsonGetArray(json *J);
 json *jsonGetObject(json *J);
 int jsonGetBool(json *J);
@@ -85,16 +91,18 @@ int jsonIsString(json *j);
 int jsonIsInt(json *j);
 int jsonIsFloat(json *j);
 
-char *jsonToString(json *j, size_t *len);
-
 json *jsonParse(char *raw_json);
 json *jsonParseWithFlags(char *raw_json, int flags);
 json *jsonParseWithLen(char *raw_json, size_t buflen);
 json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags);
+void jsonRelease(json *J);
+
+int jsonGetError(json *j);
 char *jsonGetStrerror(json *J);
 void jsonPrintError(json *J);
+char *jsonToString(json *j, size_t *len);
+int jsonOk(json *j);
 void jsonPrint(json *J);
-void jsonRelease(json *J);
 
 #ifdef __cplusplus
 }
