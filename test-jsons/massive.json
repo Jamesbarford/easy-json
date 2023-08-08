@@ -109,12 +109,12 @@
         "drafts": [
           {
             "subject": "New project proposal",
-            "recipient": "John Doe",
+            "recipient": "Robert Doe",
             "timestamp": "2022-01-11T22:00:00"
           },
           {
             "subject": "Weekly update",
-            "recipient": "Jane Doe",
+            "recipient": "Snoop Dogg",
             "timestamp": "2022-01-12T23:00:00"
           }
         ]
@@ -144,6 +144,7 @@
           }
         ]
       }
-    }
+    },
+    "misc": null
   }
 }

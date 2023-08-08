@@ -1,6 +1,12 @@
-/**
+/* Copyright (C) 2023 James W M Barford-Evans
+ * <jamesbarfordevans at gmail dot com>
+ * All Rights Reserved
+ *
+ * This code is released under the BSD 2 clause license.
+ * See the COPYING file for more information.
+ *
  * Command line wrapper for Easy JSON, times parsing a json buffer and times
- * freeing the struct
+ * freeing the struct, prints error if there is one
  */
 #include <sys/stat.h>
 
@@ -60,13 +66,16 @@ int main(int argc, char **argv) {
     free(raw_json);
     jsonPrint(J);
 
-    printf("%s\n", jsonToString(J, NULL));
+    if (J->state->error != JSON_OK) {
+        jsonPrintError(J);
+    }
+
     clock_t start_free = clock();
     jsonRelease(J);
     clock_t end_free = clock();
     long double elapsed_free = (double)(end_free - start_free) /
             CLOCKS_PER_SEC * 1000;
 
-    printf("parsed in: %0.10Lfms\n", elapsed_ms);
-    printf("freed in:  %0.10Lfms\n", elapsed_free);
+    fprintf(stderr, "parsed in: %0.10Lfms\n", elapsed_ms);
+    fprintf(stderr, "freed in:  %0.10Lfms\n", elapsed_free);
 }

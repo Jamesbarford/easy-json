@@ -1,3 +1,10 @@
+/* Copyright (C) 2023 James W M Barford-Evans
+ * <jamesbarfordevans at gmail dot com>
+ * All Rights Reserved
+ *
+ * This code is released under the BSD 2 clause license.
+ * See the COPYING file for more information. */
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +23,7 @@
  * Get item from an array of json or return null
  */
 json *jsonArrayAt(json *j, int idx) {
-    if (!j || j->type != JSON_ARRAY) {
+    if (!jsonIsArray(j) || idx < 0) {
         return NULL;
     }
 
@@ -29,32 +36,25 @@ json *jsonArrayAt(json *j, int idx) {
     }
 
     /* The idx was passed the number of elements in the list */
-    if (node == NULL && i != idx) {
+    if ((node == NULL) || (i != idx)) {
         return NULL;
     }
 
     return node;
 }
 
-static json *_jsonObjectAt(json *j, const char *name, int insensative) {
-    if (j == NULL || name == NULL) {
+static json *_jsonObjectAt(json *j, const char *name,
+                           int (*_strcmp)(const char *, const char *)) {
+    if (!jsonIsObject(j) || name == NULL) {
         return NULL;
     }
 
-    int (*_strcmp)(const char *, const char *);
     json *el = j->object;
-
-    if (insensative) {
-        _strcmp = strcasecmp;
-    } else {
-        _strcmp = strcmp;
-    }
-
-    while ((el != NULL) && el->key != NULL && (_strcmp(name, el->key) != 0)) {
+    while ((el != NULL) && (el->key != NULL) && (_strcmp(name, el->key) != 0)) {
         el = el->next;
     }
 
-    if (el == NULL || el->key == NULL) {
+    if ((el == NULL) || (el->key == NULL)) {
         return NULL;
     }
 
@@ -64,32 +64,39 @@ static json *_jsonObjectAt(json *j, const char *name, int insensative) {
 static int jsonTypeCheck(json *j, char tk) {
     switch (tk) {
     case 's':
-        if (!jsonIsString(j))
+        if (!jsonIsString(j)) {
             return 0;
+        }
         return 1;
     case 'i':
-        if (!jsonIsInt(j))
+        if (!jsonIsInt(j)) {
             return 0;
+        }
         return 1;
     case 'f':
-        if (!jsonIsFloat(j))
+        if (!jsonIsFloat(j)) {
             return 0;
+        }
         return 1;
     case 'o':
-        if (!jsonIsObject(j))
+        if (!jsonIsObject(j)) {
             return 0;
+        }
         return 1;
     case 'a':
-        if (!jsonIsArray(j))
+        if (!jsonIsArray(j)) {
             return 0;
+        }
         return 1;
     case 'b':
-        if (!jsonIsBool(j))
+        if (!jsonIsBool(j)) {
             return 0;
+        }
         return 1;
     case '!':
-        if (!jsonIsNull(j))
+        if (!jsonIsNull(j)) {
             return 0;
+        }
         return 1;
     default:
         return 0;
@@ -100,14 +107,14 @@ static int jsonTypeCheck(json *j, char tk) {
  * Get from an object if the key matches the name - case sensitive
  */
 json *jsonObjectAtCaseSensitive(json *j, const char *name) {
-    return _jsonObjectAt(j, name, 0);
+    return _jsonObjectAt(j, name, strcmp);
 }
 
 /**
  * Get from an object if the key matches the name - case insensitive
  */
 json *jsonObjectAtCaseInSensitive(json *j, const char *name) {
-    return _jsonObjectAt(j, name, 1);
+    return _jsonObjectAt(j, name, strcasecmp);
 }
 
 /**
@@ -143,7 +150,9 @@ json *jsonSelect(json *j, const char *fmt, ...) {
      * Heavily inspired by:
      * https://github.com/antirez/stonky/blob/main/stonky.c
      *
-     * At one point there was a PR in CJSON that rejected this contribution.
+     * There was an issue in CJSON that rejected this contribution.
+     * https://github.com/DaveGamble/cJSON/issues/553
+     *
      * It is offered here as a separate compilable unit.
      *
      * The fmt string is parsed, the JSON path is built and the
@@ -158,19 +167,29 @@ json *jsonSelect(json *j, const char *fmt, ...) {
      * object.
      */
     int next = JSON_SEL_INVALD;
-    char path[JSON_SEL_MAX_BUF + 1], buf[64], *s = NULL;
-    int path_len = 0, len = 0;
+    char path[JSON_SEL_MAX_BUF + 1], buf[64], *s = NULL, *end;
+    int path_len = 0, len = 0, idx = -1;
     va_list ap;
 
     va_start(ap, fmt);
     const char *ptr = fmt;
+
+    if (*ptr != '.') {
+        return NULL;
+    }
 
     while (1) {
         if (path_len && (*ptr == '\0' || strchr(".[]:", *ptr))) {
             path[path_len] = '\0';
             switch (next) {
             case JSON_SEL_ARRAY:
-                j = jsonArrayAt(j, atoi(path));
+                idx = (int)strtol(path, &end, 10);
+
+                if (idx == 0 && *end != '\0') {
+                    goto fail;
+                }
+
+                j = jsonArrayAt(j, idx);
                 if (!j) {
                     goto fail;
                 }
@@ -202,6 +221,7 @@ json *jsonSelect(json *j, const char *fmt, ...) {
                 if (next == JSON_SEL_ARRAY) {
                     int idx = va_arg(ap, int);
                     len = snprintf(buf, sizeof(buf), "%d", idx);
+                    buf[len] = '\0';
                     s = buf;
                 } else if (next == JSON_SEL_OBJ) {
                     s = va_arg(ap, char *);
