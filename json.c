@@ -137,7 +137,7 @@ static void jsonStringCatf(jsonString *js, const char *fmt, ...) {
     va_list ap, copy;
     va_start(ap, fmt);
 
-    size_t min_len = 128;
+    size_t min_len = 512;
     size_t bufferlen = strlen(fmt) * 3;
     size_t len = 0;
     bufferlen = bufferlen > min_len ? bufferlen : min_len;
