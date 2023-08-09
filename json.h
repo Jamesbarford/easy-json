@@ -4,8 +4,8 @@
  *
  * This code is released under the BSD 2 clause license.
  * See the COPYING file for more information. */
-#ifndef __JSON_H
-#define __JSON_H
+#ifndef JSON_H
+#define JSON_H
 
 #ifdef __cplusplus
 extern "C" {
