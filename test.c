@@ -40,13 +40,14 @@ char *readFile(char *path) {
     long size = lseek(fd, 0, SEEK_END);
     lseek(fd, 0, SEEK_SET);
 
-    if ((buffer = malloc(sizeof(char) * size)) == NULL) {
+    if ((buffer = malloc(sizeof(char) * (size + 1))) == NULL) {
         panic("Cannot malloc buffer: %s\n", strerror(errno));
     }
 
     if (read(fd, buffer, size) != size) {
         panic("Failed to read file: %s\n", strerror(errno));
     }
+    buffer[size] = '\0';
 
     close(fd);
     return buffer;

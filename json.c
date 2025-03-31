@@ -14,6 +14,8 @@
 
 #include "json.h"
 
+#define JSON_ALLOCATOR_INITIAL_SIZE (4096)
+
 #define __bufput(b, i, c) ((b)[(*i)++] = (c))
 
 #define isWhiteSpace(ch)                                                  \
@@ -53,6 +55,100 @@ typedef enum JsonParserType {
 } JsonParserType;
 
 static unsigned char *escapeString(char *buf);
+typedef struct jsonAllocatorBlock jsonAllocatorBlock;
+
+typedef struct jsonAllocatorBlock {
+    unsigned int capacity;
+    unsigned int used;
+    void *mem;
+    jsonAllocatorBlock *next; 
+} jsonAllocatorBlock; 
+
+typedef struct jsonAllocator {
+    unsigned int block_capacity;
+    unsigned int used;
+    jsonAllocatorBlock *head; /* Active block */
+    jsonAllocatorBlock *tail; /* Used blocks */
+} jsonAllocator;
+
+static unsigned int jsonAllocatorAlignMemorySize(unsigned int size) {
+    static const int alignment = 8;
+    return (size + (alignment - 1)) & ~(alignment - 1);
+}
+
+static jsonAllocatorBlock *jsonAllocatorBlockNew(unsigned int capacity) {
+    jsonAllocatorBlock *block = (jsonAllocatorBlock *)malloc(sizeof(jsonAllocatorBlock));
+    block->capacity = capacity;
+    block->used = 0;
+    block->mem = (void *)malloc(capacity);
+    return block;
+}
+
+static jsonAllocator *jsonAllocatorNew(unsigned int capacity) {
+    jsonAllocator *allocator = (jsonAllocator *)malloc(sizeof(jsonAllocator));
+    allocator->tail = NULL;
+    allocator->block_capacity = jsonAllocatorAlignMemorySize(capacity);
+    allocator->used = 0;
+    allocator->head = jsonAllocatorBlockNew(capacity);
+    return allocator;
+}
+
+static void *jsonAlloc(jsonAllocator *allocator, unsigned int size) {
+    /* Allocate aligned memory only */
+    unsigned int allocation_size = jsonAllocatorAlignMemorySize(size);
+    /* Keep a track of how big this is getting */
+    allocator->used += allocation_size;
+    /* If we are allocating something larger than the block allocation_size,
+     * then simply allocate it */
+    if (allocation_size > allocator->block_capacity) {
+        /* Do not set `block->used` so `arenaBlockRelease(...)` doesn't touch 
+         * arbitrary memory */
+        jsonAllocatorBlock *block = jsonAllocatorBlockNew(allocation_size);
+        block->next = allocator->tail;
+        /* Immediately add to the list of blocks that are used up */
+        allocator->tail = block;
+        return block->mem;
+    } else {
+        jsonAllocatorBlock *block = allocator->head;
+        /* We accept that `mem` may not be fully used up. In fact it probably 
+         * never is. This keeps the implementation fast and simple. */
+        if (block->used + allocation_size >= block->capacity) {
+            jsonAllocatorBlock *new_block = jsonAllocatorBlockNew(allocator->block_capacity);
+            block->next = allocator->tail;
+            allocator->tail = block;
+            allocator->head = new_block;
+            /* Set block to the new block */
+            block = new_block;
+        }
+
+        void *memory = block->mem;
+        block->used += allocation_size;
+        block->mem = ((char *)block->mem) + allocation_size;
+        return memory;
+    }
+}
+
+static void jsonAllocatorBlockRelease(jsonAllocatorBlock *block) {
+    if (block) {
+        /* Need to go to the start address */
+        free(((char *)block->mem) - block->used);
+        free(block);
+    }
+}
+
+static void jsonAllocatorRelease(jsonAllocator *allocator) {
+    if (allocator) {
+        jsonAllocatorBlockRelease(allocator->head);
+        jsonAllocatorBlock *block = allocator->tail;
+        jsonAllocatorBlock *next = NULL;
+        while (block) {
+            next = block->next;
+            jsonAllocatorBlockRelease(block);
+            block = next;
+        }
+        free(allocator);
+    }
+}
 
 typedef struct jsonParser {
     /* data type being parsed */
@@ -76,6 +172,7 @@ typedef struct jsonParser {
     /* State of the parser and the resulting state of the parsed json when
      * finished */
     jsonState *state;
+    jsonAllocator *allocator;
 } jsonParser;
 
 typedef struct jsonString {
@@ -160,6 +257,7 @@ static void jsonStringCatf(jsonString *js, const char *fmt, ...) {
         break;
     }
 
+    buf[len] = '\0';
     jsonStringCatLen(js, buf, len);
     free(buf);
     va_end(ap);
@@ -253,8 +351,9 @@ char *jsonToString(json *j, size_t *_len) {
 /*=============================================================================
  * JSON Parser routines
  *============================================================================*/
-static jsonState *jsonStateNew(void) {
-    jsonState *json_state = malloc(sizeof(jsonState));
+static jsonState *jsonStateNew(jsonParser *p) {
+    jsonState *json_state = (jsonState *)jsonAlloc(p->allocator,
+                                                   sizeof(jsonState));
     json_state->error = JSON_OK;
     json_state->ch = '\0';
     json_state->offset = 0;
@@ -396,8 +495,8 @@ static size_t getNextNonWhitespaceIdx(const char *ptr) {
 /**
  * Create new json object
  */
-static json *jsonNew(void) {
-    json *J = malloc(sizeof(json));
+static json *jsonNew(jsonParser *p) {
+    json *J = (json *)jsonAlloc(p->allocator, sizeof(json));
     J->type = JSON_NULL;
     J->key = NULL;
     J->next = NULL;
@@ -480,6 +579,7 @@ static void jsonParserInit(jsonParser *p, char *buffer, size_t buflen) {
     p->J = NULL;
     p->ptr = NULL;
     p->errno = JSON_OK;
+    p->allocator = jsonAllocatorNew(JSON_ALLOCATOR_INITIAL_SIZE);
 }
 
 /* All prototypes for parsing */
@@ -940,7 +1040,7 @@ static char *jsonParseString(jsonParser *p) {
     }
 
     size_t len = 0;
-    char *str = malloc(sizeof(char) * end - start);
+    char *str = (char *)jsonAlloc(p->allocator, sizeof(char) * end - start);
 
     while (run && jsonPeek(p) != '\0') {
         switch (jsonPeek(p)) {
@@ -999,9 +1099,7 @@ static char *jsonParseString(jsonParser *p) {
     return str;
 
 err:
-    if (str) {
-        free(str);
-    }
+    /* @Leak */
     return NULL;
 }
 
@@ -1117,7 +1215,7 @@ static json *jsonParseObject(jsonParser *p) {
     char ch = '\0';
     int can_advance = 0;
     json *J;
-    json *val = jsonNew();
+    json *val = jsonNew(p);
     p->ptr = val;
 
     while (1) {
@@ -1125,7 +1223,6 @@ static json *jsonParseObject(jsonParser *p) {
         jsonAdvanceWhitespace(p);
 
         if (jsonPeek(p) != '"') {
-            free(val);
             p->errno = JSON_INVALID_KEY_TERMINATOR_CHARACTER;
             return NULL;
         }
@@ -1133,7 +1230,6 @@ static json *jsonParseObject(jsonParser *p) {
         J->key = jsonParseString(p);
         jsonAdvanceToTerminator(p, ':');
         if (jsonPeek(p) != ':') {
-            free(val);
             p->errno = JSON_INVALID_KEY_TERMINATOR_CHARACTER;
             return NULL;
         }
@@ -1155,14 +1251,13 @@ static json *jsonParseObject(jsonParser *p) {
             } else if (ch == '}' && !can_advance) {
                 break;
             } else {
-                free(val);
                 p->errno = JSON_INVALID_JSON_TYPE_CHAR;
                 return NULL;
             }
         }
 
         jsonAdvance(p);
-        J->next = jsonNew();
+        J->next = jsonNew(p);
         p->ptr = J->next;
     }
 
@@ -1187,7 +1282,7 @@ static json *jsonParseArray(jsonParser *p) {
     char ch = '\0';
     int can_advance = 0;
     json *J;
-    json *val = jsonNew();
+    json *val = jsonNew(p);
     p->ptr = val;
 
     while (1) {
@@ -1208,14 +1303,13 @@ static json *jsonParseArray(jsonParser *p) {
             } else if (ch == ']' && !can_advance) {
                 break;
             } else {
-                free(val);
                 p->errno = JSON_INVALID_ARRAY_CHARACTER;
                 return NULL;
             }
         }
 
         jsonAdvance(p);
-        J->next = jsonNew();
+        J->next = jsonNew(p);
         p->ptr = J->next;
     }
 
@@ -1309,7 +1403,7 @@ static unsigned char *escapeString(char *buf) {
     }
 
     len = (size_t)(ptr - (unsigned char *)buf) + escape_chars;
-    outbuf = malloc(sizeof(char) * len);
+    outbuf = malloc(sizeof(char) * len+2);
 
     if (escape_chars == 0) {
         memcpy(outbuf, buf, len);
@@ -1440,54 +1534,10 @@ static void __json_print(json *J, int depth) {
     }
 }
 
-/**
- * Recursively frees whole JSON object
- */
+/* Release the allocator */
 void jsonRelease(json *J) {
-    if (J == NULL) {
-        return;
-    }
-    json *ptr = J;
-    json *next = NULL;
-
-    while (ptr) {
-        next = ptr->next;
-        if (ptr->key) {
-            free(ptr->key);
-        }
-
-        switch (ptr->type) {
-
-        case JSON_STRNUM:
-            if (ptr->strnum) {
-                free(ptr->strnum);
-            }
-            break;
-
-        case JSON_STRING:
-            if (ptr->str) {
-                free(ptr->str);
-            }
-            break;
-
-        case JSON_ARRAY:
-            jsonRelease(ptr->array);
-            break;
-
-        case JSON_OBJECT:
-            jsonRelease(ptr->object);
-            break;
-
-        case JSON_FLOAT:
-        case JSON_INT:
-        case JSON_BOOL:
-        case JSON_NULL:
-            break;
-        }
-
-        free(ptr);
-        ptr = next;
-    }
+    jsonAllocator *allocator = (jsonAllocator *)J->state->mem;
+    jsonAllocatorRelease(allocator);
 }
 
 static jsonString *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
@@ -1650,7 +1700,7 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags) {
 
     jsonAdvanceWhitespace(&p);
     char peek = jsonPeek(&p);
-    json *J = jsonNew();
+    json *J = jsonNew(&p);
 
     p.J = J;
 
@@ -1668,10 +1718,11 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags) {
         p.errno = JSON_CANNOT_START_PARSE;
     }
 
-    J->state = jsonStateNew();
+    J->state = jsonStateNew(&p);
     J->state->error = p.errno;
     J->state->ch = p.buffer[p.offset];
     J->state->offset = p.offset;
+    J->state->mem = (void *)p.allocator;
 
 #ifdef ERROR_REPORTING
     if (p.errno != JSON_OK) {
