@@ -18,6 +18,20 @@
 #include "json-selector.h"
 #include "json.h"
 
+json *jsonParseOrPanic(char *raw_json) {
+    json *j = jsonParseWithLen(raw_json, strlen(raw_json));
+    if (!j) {
+        fprintf(stderr, "Json Parser Error - json is NULL\n");
+        exit(1);
+    } else if (!jsonOk(j)) {
+        char *error = jsonGetStrerror(j);
+        fprintf(stderr, "Json Parser Error: %s\n",error);
+        free(error);
+        exit(1);
+    }
+    return j;
+}
+
 void panic(char *fmt, ...) {
     va_list va;
     char msg[1024];
@@ -85,30 +99,30 @@ void testParsingFloats(void) {
     char *float_8 = "[.123]";
     char *float_9 = "[-1.50139930144708198E18]";
 
-    json *parsed = jsonParse(float_1);
+    json *parsed = jsonParseOrPanic(float_1);
     testCondition(floatEqual(parsed->array->floating, 0.123456789));
     test("  Parsing %s\n", float_1);
     jsonRelease(parsed);
 
-    parsed = jsonParse(float_2);
+    parsed = jsonParseOrPanic(float_2);
     testCondition(floatEqual(parsed->array->floating, 0.12345));
     test("  Parsing %s\n", float_2);
     jsonRelease(parsed);
 
-    parsed = jsonParse(float_3);
+    parsed = jsonParseOrPanic(float_3);
     testCondition(
             floatEqual(parsed->array->floating, 123123123123.123131231231));
     test("  Parsing %s\n", float_3);
     jsonRelease(parsed);
 
-    parsed = jsonParse(float_4);
+    parsed = jsonParseOrPanic(float_4);
     testCondition(
             floatEqual(parsed->array->floating, 800800800.7007007007001111));
     test("  Parsing %s = %1.17g == %1.17Lg\n", float_4, parsed->array->floating,
          strtold("800800800.7007007007001111", NULL));
     jsonRelease(parsed);
 
-    parsed = jsonParse(float_5);
+    parsed = jsonParseOrPanic(float_5);
     testCondition(floatEqual(parsed->array->floating, -103.342));
     test("  Parsing %s\n", float_5);
     jsonRelease(parsed);
@@ -118,17 +132,17 @@ void testParsingFloats(void) {
     test("  Parsing %s\n", float_6);
     jsonRelease(parsed);
 
-    parsed = jsonParse(float_7);
+    parsed = jsonParseOrPanic(float_7);
     testCondition(floatEqual(parsed->array->floating, 123.0));
     test("  Parsing %s\n", float_7);
     jsonRelease(parsed);
 
-    parsed = jsonParse(float_8);
+    parsed = jsonParseOrPanic(float_8);
     testCondition(floatEqual(parsed->array->floating, 0.123));
     test("  Parsing %s\n", float_8);
     jsonRelease(parsed);
 
-    parsed = jsonParse(float_9);
+    parsed = jsonParseOrPanic(float_9);
     testCondition(floatEqual(parsed->array->floating, -1.50139930144708198E18));
     test("  Parsing %s\n", float_9);
     jsonRelease(parsed);
@@ -144,42 +158,42 @@ void testParsingInts(void) {
     char *int_7 = "[0]";
     char *int_8 = "[10101010100101010]";
 
-    json *parsed = jsonParse(int_1);
+    json *parsed = jsonParseOrPanic(int_1);
     testCondition(parsed->array->integer == 1234567890);
     test("  Parsing %s\n", int_1);
     jsonRelease(parsed);
 
-    parsed = jsonParse(int_2);
+    parsed = jsonParseOrPanic(int_2);
     testCondition(parsed->array->integer == 0xFF);
     test("  Parsing %s\n", int_2);
     jsonRelease(parsed);
 
-    parsed = jsonParse(int_3);
+    parsed = jsonParseOrPanic(int_3);
     testCondition(parsed->array->integer == -12312312);
     test("  Parsing %s\n", int_3);
     jsonRelease(parsed);
 
-    parsed = jsonParse(int_4);
+    parsed = jsonParseOrPanic(int_4);
     testCondition(parsed->array->integer == 100);
     test("  Parsing %s\n", int_4);
     jsonRelease(parsed);
 
-    parsed = jsonParse(int_5);
+    parsed = jsonParseOrPanic(int_5);
     testCondition(parsed->array->integer == -5514085325291784739);
     test("  Parsing %s\n", int_5);
     jsonRelease(parsed);
 
-    parsed = jsonParse(int_6);
+    parsed = jsonParseOrPanic(int_6);
     testCondition(parsed->array->integer == 1);
     test("  Parsing %s\n", int_6);
     jsonRelease(parsed);
 
-    parsed = jsonParse(int_7);
+    parsed = jsonParseOrPanic(int_7);
     testCondition(parsed->array->integer == 0);
     test("  Parsing %s\n", int_7);
     jsonRelease(parsed);
 
-    parsed = jsonParse(int_8);
+    parsed = jsonParseOrPanic(int_8);
     testCondition(parsed->array->integer == 10101010100101010);
     test("  Parsing %s\n", int_8);
     jsonRelease(parsed);
@@ -258,7 +272,7 @@ int safeStrcmp(char *s1, char *s2) {
 
 void testJsonSelector(void) {
     char *raw_json = readFile("./test-jsons/massive.json");
-    json *j = jsonParse(raw_json);
+    json *j = jsonParseOrPanic(raw_json);
     json *sel = NULL;
     char *expected_emails[] = {
             "Jane Doe",
