@@ -7,11 +7,20 @@ JSON parsing simplified.
 * High level api jq-like for selecting properties from the parsed JSON.
 * Fast. Uses SIMD 2 (for skipping whitespace).
 * Differentiate between `ints` and `floats`
+* Arena allocator - freeing is O(1)
 
 Easy JSON is a lightweight and fast JSON parser with an emphasis on ease of use 
 for parsing and accessing properties in the parsed JSON. I was wanting something
 that had a small surface area, solid error handling and a `jq` like syntax for 
 simplifying accessing properties off JSON.
+
+The memory is allocated using an arena, including strings, this means if you
+need a string to exist past the lifetime of the struct you will need to call
+something like `strdup`. The arena minimises the number of allocations needed
+to create the `json` struct and simplifies freeing the memory at the cost 
+of almost certainly over allocating memory. Calling `jsonToString` or
+`jsonGetStrerror` _does_ return a string allocated by `malloc` thus needs 
+to be freed.
 
 The is error handling and reporting suitable for use with multiple threads as
 The error state is unique per parsed JSON. Thus if you are parsing mulitple 
