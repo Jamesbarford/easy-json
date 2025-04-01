@@ -35,9 +35,13 @@ typedef struct jsonState {
     int error;
     char ch;
     size_t offset;
+    /* A handle to the memory arena */
+    void *mem;
 } jsonState;
 
 typedef struct json json;
+/* Everything on this struct is created by an arena, do NOT call free on any 
+ * of the individual properties */
 typedef struct json {
     jsonState *state;
     json *next;

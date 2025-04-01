@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
         __panic("Failed to open file: %s\n", strerror(errno));
     }
 
-    raw_json = malloc(sizeof(char) * st.st_size);
+    raw_json = malloc(sizeof(char) * (st.st_size+2));
 
     if (fread(raw_json, 1, st.st_size, fp) != st.st_size) {
         __panic("Failed to read file: %s\n", strerror(errno));
