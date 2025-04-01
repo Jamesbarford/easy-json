@@ -159,6 +159,8 @@ typedef struct jsonParser {
     size_t offset;
     /* length of the buffer */
     size_t buflen;
+    /* The end of the buffer */
+    char *endptr;
     /* error code when failing to parse the buffer */
     JSON_ERRNO errno;
     /* pointer to the root of the json object that represents
@@ -297,7 +299,7 @@ static void _jsonToString(json *J, jsonString *js) {
         case JSON_STRING:
             jsonConcatKey(J, js);
             unsigned char *escape_str = escapeString(J->str);
-            jsonStringCatf(js, "\"%s\"", (char *)J->str);
+            jsonStringCatf(js, "\"%s\"", (char *)escape_str);
             free(escape_str);
             break;
 
@@ -408,6 +410,32 @@ static double I64Pow10(int idx) {
     return powers_of_10[idx];
 }
 
+
+#if defined(__GNUC__) || defined(__clang__)
+#define countTrailingZeros(x) ((x) == 0 ? 16 : __builtin_ctz(x))
+#else
+static inline int countTrailingZeros(uint16_t n) {
+    if (n == 0) return 16;
+    int c = 0;
+    while (((n >> c) & 1) == 0) {
+        c++;
+    }
+    return c;
+}
+#endif
+
+static size_t getNextNonWhitespaceIdxSimple(char *start, const char *ptr, char *endptr, int *_ok) {
+    while (isWhiteSpace(*ptr)) {
+        ++ptr;
+    }
+    if (ptr == endptr && isWhiteSpace(*(ptr-1))) {
+         *_ok = 0;
+         return ptr - start;
+    }
+    *_ok = 1;
+    return ptr - start;
+}
+
 /**
  * Use SMID if avalible for machine, this is the one I have on my
  * computer hence the one I've implemented. Makes moving past
@@ -415,11 +443,12 @@ static double I64Pow10(int idx) {
  */
 #if defined(__SSE2__)
 #include <emmintrin.h>
-static size_t getNextNonWhitespaceIdx(const char *ptr) {
+static size_t getNextNonWhitespaceIdx(const char *ptr, char *endptr, int *_ok) { 
     char *start = (char *)ptr;
     if (isWhiteSpace(*ptr)) {
         ++ptr;
     } else {
+        *_ok = 1;
         return 0;
     }
 
@@ -435,8 +464,14 @@ static size_t getNextNonWhitespaceIdx(const char *ptr) {
         if (isWhiteSpace(*ptr)) {
             ++ptr;
         } else {
+            *_ok = 1;
             return ptr - start;
         }
+    }
+
+    if (ptr == endptr) {
+        *_ok = 0;
+        return ptr-start;
     }
 
     static const char whitespaces[4][16] = {
@@ -475,20 +510,100 @@ static size_t getNextNonWhitespaceIdx(const char *ptr) {
         if (r != 0) {
             /* use __builtin_fss to find the first set bit in the mask (non
              * white space character) */
+            *_ok = 1;
             return (ptr + __builtin_ffs(r) - 1) - start;
         }
+
+        if (ptr + 16 >= endptr) {
+            *_ok = 0;
+            return ptr-start;
+        }
+
         ptr += 16;
     }
 }
+#elif defined(__ARM_NEON)
+#include <arm_neon.h>
+static size_t getNextNonWhitespaceIdx(const char *ptr, char *endptr, int *_ok) {
+    char *start = (char *)ptr;
 
+    if (isWhiteSpace(*ptr)) {
+        ++ptr;
+    } else {
+        *_ok = 1;
+        return 0;
+    }
+
+    const char *next_boundary = (const char *)((((size_t)ptr) + 15) &
+                                               ~((size_t)15));
+
+    /* loop through characters until the next boundary
+     * checking for whitespaces */
+    while (ptr < next_boundary) {
+        if (isWhiteSpace(*ptr)) {
+            ++ptr;
+        } else {
+            *_ok = 1;
+            return (size_t)(ptr - start);
+        }
+    }
+
+    /* If we don't have 16 bytes to look at then fall back to the simple 
+     * version. */
+    if (ptr + 16 >= endptr) {
+        return getNextNonWhitespaceIdxSimple(start, ptr, endptr, _ok);
+    }
+
+    const uint8x16_t w_space = vdupq_n_u8(' ');
+    const uint8x16_t w_nl = vdupq_n_u8('\n');
+    const uint8x16_t w_cr = vdupq_n_u8('\r');
+    const uint8x16_t w_tab = vdupq_n_u8('\t');
+    // Constant bit mask pattern for horizontal add method
+    // {1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128}
+    const uint8x16_t bit_mask_pattern = vcombine_u8(
+        (uint8x8_t){1, 2, 4, 8, 16, 32, 64, 128},
+        (uint8x8_t){1, 2, 4, 8, 16, 32, 64, 128}
+    );
+
+    /* Find next non-whitespace character 16 characters at a time */
+    while (1) {
+        /* Load 16 bytes from the input string. We've pre-checked that 
+         * 16 bytes are avalible */
+        const uint8x16_t s = vld1q_u8((const uint8_t *)(ptr));
+
+        /* Compare chunk of 16 characters to whitespace constants */
+        uint8x16_t whitespace_mask = vceqq_u8(s, w_space);
+        whitespace_mask = vorrq_u8(whitespace_mask, vceqq_u8(s, w_nl));
+        whitespace_mask = vorrq_u8(whitespace_mask, vceqq_u8(s, w_cr));
+        whitespace_mask = vorrq_u8(whitespace_mask, vceqq_u8(s, w_tab));
+
+        uint8x16_t non_whitespace_mask = vmvnq_u8(whitespace_mask);
+        uint8x16_t masked_bits = vandq_u8(non_whitespace_mask, bit_mask_pattern);
+
+        uint8_t low_byte_mask = vaddv_u8(vget_low_u8(masked_bits));
+        uint8_t high_byte_mask = vaddv_u8(vget_high_u8(masked_bits));
+
+        uint16_t combined_mask = (uint16_t)low_byte_mask | ((uint16_t)high_byte_mask << 8);
+
+        if (combined_mask != 0) {
+            int index_in_block = countTrailingZeros(combined_mask);
+            *_ok = 1;
+            return (size_t)((ptr + index_in_block) - start);
+        }
+
+        if (ptr + 16 >= endptr) {
+            return getNextNonWhitespaceIdxSimple(start, ptr, endptr, _ok);
+        }
+
+        ptr += 16;
+    }
+
+    return (size_t)(ptr - start);
+}
 #else
 /* Much simpler niave version */
-static size_t getNextNonWhitespaceIdx(const char *ptr) {
-    char *start = (char *)ptr;
-    while (isWhiteSpace(*ptr)) {
-        ++ptr;
-    }
-    return ptr - start;
+static size_t getNextNonWhitespaceIdx(const char *ptr, char *endptr, int *_ok) {
+    return getNextNonWhitespaceIdxSimple(ptr, ptr, endptr, _ok);
 }
 #endif
 
@@ -564,8 +679,13 @@ static void jsonAdvanceToTerminator(jsonParser *p, char terminator) {
 /**
  * Advance past whitespace characters
  */
-static void jsonAdvanceWhitespace(jsonParser *p) {
-    p->offset += getNextNonWhitespaceIdx(p->buffer + p->offset);
+static int jsonAdvanceWhitespace(jsonParser *p) {
+    int ok = 0;
+    p->offset += getNextNonWhitespaceIdx(p->buffer + p->offset, p->endptr, &ok);
+    if (!ok) {
+        p->errno = JSON_UNTERMINATED;
+    }
+    return ok;
 }
 
 /**
@@ -579,6 +699,7 @@ static void jsonParserInit(jsonParser *p, char *buffer, size_t buflen) {
     p->J = NULL;
     p->ptr = NULL;
     p->errno = JSON_OK;
+    p->endptr = p->buffer + p->buflen;
     p->allocator = jsonAllocatorNew(JSON_ALLOCATOR_INITIAL_SIZE);
 }
 
@@ -1206,7 +1327,10 @@ static int jsonSetExpectedType(jsonParser *p) {
 static json *jsonParseObject(jsonParser *p) {
     /* move past '{' */
     jsonAdvance(p);
-    jsonAdvanceWhitespace(p);
+    if (!jsonAdvanceWhitespace(p)) {
+        return NULL;
+    }
+
     /* Object is empty we can skip */
     if (jsonPeek(p) == '}') {
         jsonAdvance(p);
@@ -1220,7 +1344,10 @@ static json *jsonParseObject(jsonParser *p) {
 
     while (1) {
         J = p->ptr;
-        jsonAdvanceWhitespace(p);
+        if (!jsonAdvanceWhitespace(p)) {
+            return NULL;
+        }
+
 
         if (jsonPeek(p) != '"') {
             p->errno = JSON_INVALID_KEY_TERMINATOR_CHARACTER;
@@ -1235,13 +1362,18 @@ static json *jsonParseObject(jsonParser *p) {
         }
 
         jsonAdvance(p);
-        jsonAdvanceWhitespace(p);
+        if (!jsonAdvanceWhitespace(p)) {
+            return NULL;
+        }
+
 
         if (!jsonSetExpectedType(p) || !jsonParseValue(p)) {
             break;
         }
 
-        jsonAdvanceWhitespace(p);
+        if (!jsonAdvanceWhitespace(p)) {
+            return NULL;
+        }
         ch = jsonPeek(p);
         if (ch != ',') {
             can_advance = jsonCanAdvanceBy(p, 1);
@@ -1271,7 +1403,9 @@ static json *jsonParseObject(jsonParser *p) {
 static json *jsonParseArray(jsonParser *p) {
     /* move past '[' */
     jsonAdvance(p);
-    jsonAdvanceWhitespace(p);
+    if (!jsonAdvanceWhitespace(p)) {
+        return NULL;
+    }
 
     /* array empty we can skip */
     if (jsonPeek(p) == ']') {
@@ -1287,13 +1421,17 @@ static json *jsonParseArray(jsonParser *p) {
 
     while (1) {
         J = p->ptr;
-        jsonAdvanceWhitespace(p);
+        if (!jsonAdvanceWhitespace(p)) {
+            return NULL;
+        }
 
         if (!jsonSetExpectedType(p) || !jsonParseValue(p)) {
             break;
         }
 
-        jsonAdvanceWhitespace(p);
+        if (!jsonAdvanceWhitespace(p)) {
+            return NULL;
+        }
         ch = jsonPeek(p);
         if (ch != ',') {
             can_advance = jsonCanAdvanceBy(p, 1);
@@ -1441,7 +1579,7 @@ static unsigned char *escapeString(char *buf) {
                 __bufput(outbuf, &offset, 'r');
                 break;
             default:
-                offset += sprintf((char *)outbuf + offset, "u%04x",
+                offset += snprintf((char *)outbuf + offset, len-offset, "u%04x",
                                   (unsigned int)*ptr);
                 break;
             }
@@ -1653,6 +1791,10 @@ static jsonString *_jsonGetStrerror(JSON_ERRNO error, char ch, size_t offset) {
         jsonStringCatf(js, "Unexpected end of json buffer at position: %zu",
                        offset);
         break;
+    case JSON_UNTERMINATED:
+        jsonStringCatf(js, "Unexpected end of json buffer at position: %zu, unterminated whitespace",
+                       offset);
+        break;
     }
     return js;
 }
@@ -1698,7 +1840,9 @@ json *jsonParseWithLenAndFlags(char *raw_json, size_t buflen, int flags) {
     p.flags = flags;
     jsonParserInit(&p, raw_json, buflen);
 
-    jsonAdvanceWhitespace(&p);
+    if (!jsonAdvanceWhitespace(&p)) {
+        return NULL;
+    }
     char peek = jsonPeek(&p);
     json *J = jsonNew(&p);
 
